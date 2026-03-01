@@ -2,11 +2,11 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>工程ステーション管理 v2.3.0</title>
+    <title>工程ステーション管理 v2.4.0 (URL短縮版)</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --enemy: #ff5252; --own: #448AFF; }
         body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 15px; padding-bottom: 240px; font-size: 14px; }
-        .controls { background: #222; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; position: sticky; top: 10px; z-index: 100; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .controls { background: #222; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; position: sticky; top: 10px; z-index: 100; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .btn { cursor: pointer; padding: 8px 12px; border: none; border-radius: 4px; background: #444; color: white; font-weight: bold; font-size: 0.8rem; }
         .btn-add { background: #2e7d32; }
         .btn-share { background: #00897b; }
@@ -28,8 +28,8 @@
 <body>
 
 <div class="controls">
-    <button class="btn btn-add" onclick="showModal()">＋ ステーションを追加</button>
-    <button class="btn btn-share" onclick="shareURL()">共有リンクを発行(復旧用)</button>
+    <button class="btn btn-add" onclick="showModal()">＋ 追加</button>
+    <button class="btn btn-share" onclick="shareURL()">短縮リンクを発行</button>
     <div style="flex-grow: 1;"></div>
     <button class="btn" style="background:#4527a0" onclick="exportData()">保存(JSON)</button>
     <button class="btn" onclick="document.getElementById('import-file').click()">読込</button>
@@ -41,13 +41,13 @@
 <div id="modal">
     <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h3>施設リストから追加</h3>
+            <h3>施設追加</h3>
             <button class="btn" onclick="hideModal()">閉じる</button>
         </div>
         <div class="modal-filter">
             <select id="f-type" onchange="onTypeChange()"><option value="">全施設</option></select>
             <select id="f-lv" onchange="filterModal()"><option value="">全Lv</option></select>
-            <input type="text" id="f-search" placeholder="座標(x, y)で検索..." oninput="filterModal()">
+            <input type="text" id="f-search" placeholder="座標検索..." oninput="filterModal()">
         </div>
         <div id="modal-list" class="modal-scroll"></div>
     </div>
@@ -55,16 +55,17 @@
 
 <div class="summary-panel">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <strong style="color:var(--accent)">⏳ 保護終了サマリー (24h以内)</strong>
+        <strong style="color:var(--accent)">⏳ 24h以内 保護終了</strong>
         <div style="display:flex; align-items:center; gap:10px;">
-            <label style="font-size:0.75rem; color:#ccc;"><input type="checkbox" id="copy-all-flag"> 全ステーション出力</label>
-            <button class="btn" style="background:#1565c0; font-size:0.7rem;" onclick="copySummaryText()">テキストコピー</button>
+            <label style="font-size:0.75rem; color:#ccc;"><input type="checkbox" id="copy-all-flag"> 全出力</label>
+            <button class="btn" style="background:#1565c0; font-size:0.7rem;" onclick="copySummaryText()">コピー</button>
         </div>
     </div>
     <div id="summary-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:5px; max-height:150px; overflow-y:auto;"></div>
 </div>
 
 <script>
+// --- MASTER_DATA は前回と同じ（省略せず保持） ---
 const MASTER_DATA = {
     "construction": { "name": "建築", "coords": [{x:1068,y:138,lv:1},{x:537,y:138,lv:1},{x:138,y:138,lv:1},{x:138,y:666,lv:1},{x:138,y:1038,lv:1},{x:666,y:1068,lv:1},{x:1068,y:567,lv:1},{x:1068,y:1068,lv:1},{x:486,y:327,lv:3},{x:768,y:867,lv:3},{x:867,y:567,lv:3},{x:327,y:666,lv:3}] },
     "defense": { "name": "防御", "coords": [{x:666,y:138,lv:2},{x:438,y:267,lv:2},{x:138,y:537,lv:2},{x:237,y:768,lv:2},{x:537,y:1038,lv:2},{x:738,y:957,lv:2},{x:1068,y:666,lv:2},{x:957,y:438,lv:2},{x:816,y:717,lv:4},{x:387,y:717,lv:4},{x:588,y:327,lv:4}] },
@@ -84,64 +85,94 @@ Object.entries(MASTER_DATA).forEach(([k, cat]) => {
 });
 
 let userState = { selectedIds: [], timers: {}, modes: {} };
-const STORAGE_KEY = 'wos_v230_master';
+const STORAGE_KEY = 'wos_v240_master';
 const DUR = 72 * 60 * 60 * 1000;
 
-function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
+// 短縮ロジック用のマップ
+const SHORT_KEYS = { construction:'c', defense:'d', tech:'t', weapon:'w', gathering:'g', production:'p', training:'tr', expedition:'e' };
+const LONG_KEYS = Object.fromEntries(Object.entries(SHORT_KEYS).map(([k,v])=>[v,k]));
+
+function compressData(state) {
+    const compact = { s: [], t: {}, m: {} };
+    state.selectedIds.forEach(id => {
+        const parts = id.split('-');
+        const shortId = `${SHORT_KEYS[parts[0]]}${parts[1]}_${parts[2]}`;
+        compact.s.push(shortId);
+        if (state.timers[id]) compact.t[shortId] = Math.floor(state.timers[id] / 1000); // 秒単位に
+        if (state.modes[id] && state.modes[id] !== 'none') compact.m[shortId] = state.modes[id] === 'own' ? 1 : 2;
+    });
+    return compact;
+}
+
+function decompressData(compact) {
+    const state = { selectedIds: [], timers: {}, modes: {} };
+    compact.s.forEach(sid => {
+        const match = sid.match(/([a-z]+)(\d+)_(\d+)/);
+        if (!match) return;
+        const id = `${LONG_KEYS[match[1]]}-${match[2]}-${match[3]}`;
+        state.selectedIds.push(id);
+        if (compact.t[sid]) state.timers[id] = compact.t[sid] * 1000;
+        if (compact.m[sid]) state.modes[id] = compact.m[sid] === 1 ? 'own' : 'enemy';
+        else state.modes[id] = 'none';
+    });
+    return state;
+}
+
+function shareURL() {
+    const compressed = compressData(userState);
+    const b64 = btoa(JSON.stringify(compressed)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const url = window.location.origin + window.location.pathname + "?s=" + b64;
+    navigator.clipboard.writeText(url).then(() => alert("URLを短縮してコピーしました。"));
+}
 
 function load() {
     const params = new URLSearchParams(window.location.search);
-    const d = params.get('d');
-    if (d) {
+    const sParam = params.get('s'); // 短縮版
+    const dParam = params.get('d'); // 旧バージョン互換
+    
+    if (sParam) {
         try {
-            userState = JSON.parse(decodeURIComponent(atob(d)));
-            save();
-            window.history.replaceState({}, '', location.pathname);
+            const decoded = atob(sParam.replace(/-/g, '+').replace(/_/g, '/'));
+            userState = decompressData(JSON.parse(decoded));
+            save(); window.history.replaceState({}, '', location.pathname);
+        } catch(e) { console.error("URL Load Error"); }
+    } else if (dParam) {
+        try {
+            userState = JSON.parse(decodeURIComponent(atob(dParam)));
+            save(); window.history.replaceState({}, '', location.pathname);
         } catch(e) {}
     } else {
         const s = localStorage.getItem(STORAGE_KEY);
         if(s) userState = JSON.parse(s);
     }
+    
     const tSel = document.getElementById('f-type');
     Object.entries(MASTER_DATA).forEach(([k, v]) => tSel.innerHTML += `<option value="${k}">${v.name}</option>`);
     render();
 }
 
+// --- 以下、既存のUIロジック（v2.3.0と同じ） ---
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
 function onTypeChange() {
     const type = document.getElementById('f-type').value;
     const lvSel = document.getElementById('f-lv');
     const prevLv = lvSel.value;
     lvSel.innerHTML = '<option value="">全Lv</option>';
-    
     if (type) {
         const lvs = [...new Set(MASTER_DATA[type].coords.map(c => c.lv))].sort();
         lvs.forEach(l => lvSel.innerHTML += `<option value="${l}">Lv.${l}</option>`);
-        // 前のレベルが新しい施設に存在しない場合はリセット
         if (!lvs.includes(parseInt(prevLv))) lvSel.value = ""; else lvSel.value = prevLv;
     }
     filterModal();
 }
-
-function shareURL() {
-    const b64 = btoa(encodeURIComponent(JSON.stringify(userState)));
-    const url = window.location.origin + window.location.pathname + "?d=" + b64;
-    navigator.clipboard.writeText(url).then(() => alert("共有・復旧用URLをコピーしました。"));
-}
-
 function showModal() { document.getElementById('modal').style.display = 'block'; filterModal(); }
 function hideModal() { document.getElementById('modal').style.display = 'none'; }
-
 function filterModal() {
-    const type = document.getElementById('f-type').value;
-    const lv = document.getElementById('f-lv').value;
-    const search = document.getElementById('f-search').value;
+    const type = document.getElementById('f-type').value, lv = document.getElementById('f-lv').value, search = document.getElementById('f-search').value;
     const list = document.getElementById('modal-list');
     list.innerHTML = '';
     ALL_STATIONS.filter(s => {
-        const matchType = !type || s.typeKey === type;
-        const matchLv = !lv || s.lv == lv;
-        const matchSearch = !search || s.x == search || s.y == search;
-        const notAdded = !userState.selectedIds.includes(s.id);
+        const matchType = !type || s.typeKey === type, matchLv = !lv || s.lv == lv, matchSearch = !search || s.x == search || s.y == search, notAdded = !userState.selectedIds.includes(s.id);
         return matchType && matchLv && matchSearch && notAdded;
     }).forEach(s => {
         const div = document.createElement('div');
@@ -150,18 +181,14 @@ function filterModal() {
         list.appendChild(div);
     });
 }
-
 function addStation(id) { userState.selectedIds.push(id); userState.modes[id] = 'none'; save(); render(); filterModal(); }
-function removeStation(id) { if(confirm('管理を解除しますか？')) { userState.selectedIds = userState.selectedIds.filter(x => x !== id); delete userState.timers[id]; delete userState.modes[id]; save(); render(); } }
-
+function removeStation(id) { if(confirm('解除しますか？')) { userState.selectedIds = userState.selectedIds.filter(x => x !== id); delete userState.timers[id]; delete userState.modes[id]; save(); render(); } }
 function render() {
     const grid = document.getElementById('station-list');
     grid.innerHTML = '';
     userState.selectedIds.forEach(id => {
-        const s = ALL_STATIONS.find(x => x.id === id);
-        if(!s) return;
-        const mode = userState.modes[id] || 'none';
-        const t = userState.timers[id];
+        const s = ALL_STATIONS.find(x => x.id === id); if(!s) return;
+        const mode = userState.modes[id] || 'none', t = userState.timers[id];
         const card = document.createElement('div');
         card.className = `station-card ${mode==='own'?'own':''} ${mode==='enemy'?'enemy':''}`;
         card.innerHTML = `
@@ -174,20 +201,18 @@ function render() {
                 <span style="cursor:pointer; color:#777; font-size:1.2rem;" onclick="removeStation('${id}')">&times;</span>
             </div>
             <div style="font-weight:bold;">${s.typeName} Lv.${s.lv} <small style="color:#aaa">(${s.x}, ${s.y})</small></div>
-            ${t ? `<div class="countdown" id="t-${id}">--:--:--</div>
-                   <div class="jst-time" id="jst-${id}">--/-- --:--:--</div>
+            ${t ? `<div class="countdown" id="t-${id}">--:--:--</div><div class="jst-time" id="jst-${id}">--/-- --:--:--</div>
                    <div style="display:flex; gap:5px;"><button class="btn" style="background:#0277bd; flex:1" onclick="sync('${id}')">同期</button><button class="btn" style="background:#c62828" onclick="resetTimer('${id}')">解除</button></div>` 
-                : `<button class="btn" style="background:#2e7d32; width:100%; margin-top:10px;" onclick="startTimer('${id}')">今から72h保護開始</button>`}
+                : `<button class="btn" style="background:#2e7d32; width:100%; margin-top:10px;" onclick="startTimer('${id}')">72h保護開始</button>`}
         `;
         grid.appendChild(card);
     });
 }
-
 function setMode(id, m) { userState.modes[id] = m; save(); render(); }
 function startTimer(id) { userState.timers[id] = Date.now(); save(); render(); }
 function resetTimer(id) { if(confirm('解除しますか？')) { delete userState.timers[id]; save(); render(); } }
 function sync(id) {
-    const v = prompt("残り時間 (例: 1d 09:11:27)"); if(!v) return;
+    const v = prompt("残り時間 (1d 09:11:27)"); if(!v) return;
     let s=0; const d=v.match(/(\d+)d/i); if(d) s+=d[1]*86400;
     const pts=v.replace(/\d+d/i,'').replace(/[:：\s]/g,' ').trim().split(/\s+/);
     if(pts.length===3) s+=pts[0]*3600+pts[1]*60+pts[2]*1;
@@ -195,68 +220,37 @@ function sync(id) {
     else if(pts[0]!=="") s+=pts[0]*3600;
     userState.timers[id]=Date.now()+(s*1000)-DUR; save(); render();
 }
-
 function formatJST(date) {
     const days = ['日','月','火','水','木','金','土'];
-    const m = date.getMonth() + 1;
-    const d = date.getDate();
-    const dw = days[date.getDay()];
-    const h = date.getHours().toString().padStart(2,'0');
-    const min = date.getMinutes().toString().padStart(2,'0');
-    const sec = date.getSeconds().toString().padStart(2,'0');
-    return `${m}/${d}(${dw}) ${h}:${min}:${sec}`;
+    return `${date.getMonth()+1}/${date.getDate()}(${days[date.getDay()]}) ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}:${date.getSeconds().toString().padStart(2,'0')}`;
 }
-
 function tick() {
-    const now = Date.now();
-    const sum = [];
+    const now = Date.now(); const sum = [];
     userState.selectedIds.forEach(id => {
         if(!userState.timers[id]) return;
-        const endTime = userState.timers[id] + DUR;
-        const diff = endTime - now;
-        const el = document.getElementById(`t-${id}`);
-        const jstEl = document.getElementById(`jst-${id}`);
-        if(el) {
-            if(diff<=0){ el.innerText="争奪中"; el.style.color="#ff5252"; }
-            else { 
-                const h=Math.floor(diff/3600000), m=Math.floor((diff%3600000)/60000), s=Math.floor((diff%60000)/1000); 
-                el.innerText=`${h}h ${m}m ${s}s`; el.style.color="#ff5252";
-            }
-        }
+        const endTime = userState.timers[id] + DUR, diff = endTime - now;
+        const el = document.getElementById(`t-${id}`), jstEl = document.getElementById(`jst-${id}`);
+        if(el) { el.innerText = diff<=0?"争奪中":`${Math.floor(diff/3600000)}h ${Math.floor((diff%3600000)/60000)}m ${Math.floor((diff%60000)/1000)}s`; el.style.color="#ff5252"; }
         if(jstEl) jstEl.innerText = formatJST(new Date(endTime));
-
-        const s = ALL_STATIONS.find(x => x.id === id);
-        sum.push({ name: `${s.typeName} Lv.${s.lv}`, diff, mode: userState.modes[id], endTime });
+        const s = ALL_STATIONS.find(x => x.id === id); sum.push({ name: `${s.typeName} Lv.${s.lv}`, diff, mode: userState.modes[id], jst: formatJST(new Date(endTime)) });
     });
-    const sList = document.getElementById('summary-list');
     sum.sort((a,b) => a.diff - b.diff);
-    sList.innerHTML = sum.map(i => `<div style="background:#2a2a2a; padding:4px 8px; border-radius:4px; display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:3px; border-left:3px solid ${i.mode==='enemy'?'#ff5252':'#448AFF'}"><span>${i.mode==='enemy'?'●敵':'○自'} ${i.name}</span><span style="font-family:monospace;">${Math.floor(Math.max(0,i.diff)/3600000)}h ${Math.floor((Math.max(0,i.diff)%3600000)/60000)}m</span></div>`).join('');
+    document.getElementById('summary-list').innerHTML = sum.map(i => `<div style="background:#2a2a2a; padding:4px 8px; border-radius:4px; display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:3px; border-left:3px solid ${i.mode==='enemy'?'#ff5252':'#448AFF'}"><span>${i.mode==='enemy'?'●':'○'} ${i.name}</span><span style="font-family:monospace;">${Math.floor(Math.max(0,i.diff)/3600000)}h ${Math.floor((Math.max(0,i.diff)%3600000)/60000)}m</span></div>`).join('');
 }
-
 function copySummaryText() {
     const isAll = document.getElementById('copy-all-flag').checked;
-    const now = Date.now();
-    let txt = isAll ? "【ステーション全状況】\n" : "【24h以内 保護終了/争奪開始】\n";
-    
+    let txt = isAll ? "【ステーション全状況】\n" : "【24h以内 保護終了】\n";
     const items = userState.selectedIds.filter(id => userState.timers[id]).map(id => {
         const t = userState.timers[id] + DUR; const s = ALL_STATIONS.find(x => x.id === id);
-        return { name: `${s.typeName} Lv.${s.lv}`, diff: t - now, mode: userState.modes[id], jst: formatJST(new Date(t)) };
+        return { name: `${s.typeName} Lv.${s.lv}`, diff: t - Date.now(), mode: userState.modes[id], jst: formatJST(new Date(t)) };
     }).sort((a,b) => a.diff - b.diff);
-
     const filtered = isAll ? items : items.filter(i => i.diff > 0 && i.diff <= 24 * 60 * 60 * 1000);
-
-    if (filtered.length === 0) {
-        alert(isAll ? "管理中のタイマーがありません。" : "24時間以内に終了するタイマーはありません。");
-        return;
-    }
-
+    if (!filtered.length) { alert("対象がありません。"); return; }
     filtered.forEach(i => txt += `${i.mode==='enemy'?'●敵':'○自'} ${i.name}: ${i.jst} (残 ${Math.floor(Math.max(0,i.diff)/3600000)}h ${Math.floor((Math.max(0,i.diff)%3600000)/60000)}m)\n`);
     navigator.clipboard.writeText(txt).then(() => alert("サマリーをコピーしました。"));
 }
-
 function exportData() { const b = new Blob([JSON.stringify(userState)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `wos_backup.json`; a.click(); }
-function importData(e) { const r = new FileReader(); r.onload = (ev) => { try { userState = JSON.parse(ev.target.result); save(); render(); } catch(err){alert("失敗");} }; r.readAsText(e.target.files[0]); }
-
+function importData(e) { const r = new FileReader(); r.onload = (ev) => { try { userState = JSON.parse(ev.target.result); save(); render(); } catch(e){alert("失敗");} }; r.readAsText(e.target.files[0]); }
 window.onload = () => { load(); setInterval(tick, 1000); };
 </script>
 </body>
