@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>工程ステーション管理 v1.5.0</title>
+    <title>工程ステーション管理 v1.5.1</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --brd: #333; }
         body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 20px; line-height: 1.4; }
@@ -27,7 +27,7 @@
 <body>
 
 <header>
-    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.5.0 秒単位同期</small></h2>
+    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.5.1 (互換性維持版)</small></h2>
     <div class="clock-box">
         <div>JST: <span id="jst">--:--:--</span></div>
         <div>UTC: <span id="utc">--:--:--</span></div>
@@ -49,7 +49,6 @@
 <div class="station-grid" id="station-list"></div>
 
 <script>
-// マスターデータ (画像座標反映済み)
 const MASTER_DATA = {
     "construction": { "name": "建築", "color": "#FF5252", "coords": [{"x": 1068, "y": 138, "lv": 1}, {"x": 537, "y": 138, "lv": 1}, {"x": 138, "y": 138, "lv": 1}, {"x": 138, "y": 666, "lv": 1}, {"x": 138, "y": 1038, "lv": 1}, {"x": 666, "y": 1068, "lv": 1}, {"x": 1068, "y": 567, "lv": 1}, {"x": 1068, "y": 1068, "lv": 1}, {"x": 486, "y": 327, "lv": 3}, {"x": 768, "y": 867, "lv": 3}, {"x": 867, "y": 567, "lv": 3}, {"x": 327, "y": 666, "lv": 3}]},
     "defense": { "name": "防御", "color": "#448AFF", "coords": [{"x": 666, "y": 138, "lv": 2}, {"x": 438, "y": 267, "lv": 2}, {"x": 138, "y": 537, "lv": 2}, {"x": 237, "y": 768, "lv": 2}, {"x": 537, "y": 1038, "lv": 2}, {"x": 738, "y": 957, "lv": 2}, {"x": 1068, "y": 666, "lv": 2}, {"x": 957, "y": 438, "lv": 2}, {"x": 816, "y": 717, "lv": 4}, {"x": 387, "y": 717, "lv": 4}, {"x": 588, "y": 327, "lv": 4}]},
@@ -63,16 +62,42 @@ const MASTER_DATA = {
 
 let userState = { active: ["construction"], timers: {}, hidden: [] };
 const DUR = 72 * 60 * 60 * 1000;
-const STORAGE_KEY = 'wos_manager_v150';
+// 今後はこのキーで固定します
+const STORAGE_KEY = 'wos_station_manager_data';
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
-function load() { const s = localStorage.getItem(STORAGE_KEY); if(s) userState = JSON.parse(s); }
+
+function load() {
+    // 1. 最新の共通キーを確認
+    let s = localStorage.getItem(STORAGE_KEY);
+    
+    // 2. なければ古いバージョンのキーを探して救出する
+    if (!s) {
+        const legacyKeys = ['wos_manager_v150', 'wos_v130', 'wos_v120', 'wos_manager_data'];
+        for (const key of legacyKeys) {
+            const oldData = localStorage.getItem(key);
+            if (oldData) {
+                s = oldData;
+                console.log(`Migrated from ${key}`);
+                break;
+            }
+        }
+    }
+
+    if(s) {
+        try {
+            userState = JSON.parse(s);
+            // 読み込んだら最新の共通キーに保存しておく
+            save();
+        } catch(e) { console.error("Load failed", e); }
+    }
+}
 
 function exportData() {
     const blob = new Blob([JSON.stringify(userState, null, 2)], {type: 'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `wos_backup.json`;
+    a.download = `wos_station_backup.json`;
     a.click();
 }
 
@@ -153,26 +178,17 @@ function reset(id) { if(confirm('解除しますか？')) { delete userState.tim
 function hideCard(id) { userState.hidden.push(id); save(); render(); }
 function resetHidden() { userState.hidden = []; save(); render(); }
 
-// 秒単位での残り時間同期機能
 function syncTimer(id) {
-    const input = prompt("ゲーム内の残り時間を入力してください\n例: 「5:23:10」や「5 23 10」など", "");
+    const input = prompt("ゲーム内の残り時間を入力（例: 5:23:10）", "");
     if (input === null) return;
-
-    // 数値以外の区切りをスペースに統一して分割
     const parts = input.replace(/[:：\s]/g, ' ').trim().split(/\s+/);
     let h = 0, m = 0, s = 0;
-
     if (parts.length >= 1) h = parseInt(parts[0]) || 0;
     if (parts.length >= 2) m = parseInt(parts[1]) || 0;
     if (parts.length >= 3) s = parseInt(parts[2]) || 0;
-
     const remainingMs = ((h * 3600) + (m * 60) + s) * 1000;
-    
-    // 現在時刻から逆算して、タイマーの開始時刻をセットする
-    // (開始時刻 + 72h) - 現在時刻 = 残り時間  =>  開始時刻 = 現在時刻 + 残り時間 - 72h
     userState.timers[id] = Date.now() + remainingMs - DUR;
-    save();
-    render();
+    save(); render();
 }
 
 function tick() {
