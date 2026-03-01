@@ -3,69 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>工程ステーション管理 v1.7.0</title>
+    <title>工程ステーション管理 v1.9.0</title>
     <style>
-        :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --brd: #333; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 20px; line-height: 1.4; }
+        :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --brd: #333; --enemy: #b71c1c; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 20px; line-height: 1.4; padding-bottom: 200px; }
         header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--brd); padding-bottom: 10px; margin-bottom: 20px; }
-        .clock-box { background: #000; padding: 10px; border: 1px solid var(--accent); border-radius: 5px; font-family: monospace; font-size: 0.9rem; }
+        .clock-box { background: #000; padding: 10px; border: 1px solid var(--accent); border-radius: 5px; font-family: monospace; font-size: 0.85rem; }
         .controls { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        .filter-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
-        
-        /* フィルタボタンと個別リセットのセット */
+        .io-section { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .filter-group { display: flex; gap: 6px; flex-wrap: wrap; }
         .filter-item { display: flex; align-items: center; background: #333; border-radius: 4px; overflow: hidden; }
-        .filter-btn { cursor: pointer; padding: 6px 10px; border: none; color: white; font-size: 0.75rem; min-width: 80px; transition: opacity 0.2s; }
+        .filter-btn { cursor: pointer; padding: 6px 10px; border: none; color: white; font-size: 0.7rem; }
         .filter-btn.active { color: #000; font-weight: bold; }
-        .filter-reset { cursor: pointer; background: rgba(255,255,255,0.1); border: none; color: #aaa; padding: 6px 6px; font-size: 0.7rem; border-left: 1px solid rgba(0,0,0,0.2); }
-        .filter-reset:hover { background: rgba(255,255,255,0.2); color: #fff; }
-
-        .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; }
+        .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 15px; }
         .station-card { background: var(--card); border: 1px solid var(--brd); border-left: 6px solid #ccc; padding: 15px; border-radius: 6px; position: relative; }
-        .end-time { font-size: 0.85rem; color: #bb86fc; margin-top: 5px; font-weight: bold; }
+        .station-card.enemy { border-color: var(--enemy); background: linear-gradient(145deg, #1e1e1e, #2c0000); box-shadow: 0 0 10px rgba(255,0,0,0.2); }
         .countdown { font-size: 1.6rem; font-weight: bold; color: #ff5252; margin: 5px 0; font-family: monospace; }
-        .btn { cursor: pointer; padding: 6px 10px; border: none; border-radius: 4px; background: #444; color: white; font-size: 0.85rem; }
-        .btn-start { background: #2e7d32; width: 100%; font-weight: bold; margin-top: 10px; height: 40px; }
-        .btn-sync { background: #0277bd; font-weight: bold; }
-        .btn-reset { background: #c62828; font-size: 0.75rem; }
-        .btn-io { background: #4527a0; font-size: 0.8rem; }
-        .adjust-group { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
-        .close-card { position: absolute; top: 10px; right: 10px; color: #888; cursor: pointer; font-size: 1.2rem; }
+        .enemy .countdown { color: #ff8a80; }
+        .btn { cursor: pointer; padding: 6px 10px; border: none; border-radius: 4px; background: #444; color: white; font-size: 0.8rem; }
+        .btn-enemy-toggle { font-size: 0.65rem; padding: 2px 6px; margin-bottom: 5px; background: #333; border: 1px solid #555; }
+        .enemy .btn-enemy-toggle { background: var(--enemy); border-color: #ff5252; }
+        
+        /* サマリーエリア */
+        .summary-panel { position: fixed; bottom: 0; left: 0; right: 0; background: #222; border-top: 2px solid var(--accent); padding: 15px; max-height: 180px; overflow-y: auto; z-index: 100; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
+        .summary-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .summary-list { font-size: 0.85rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 5px; }
+        .summary-item { background: #333; padding: 4px 8px; border-radius: 3px; display: flex; justify-content: space-between; }
+        .summary-item.warn { color: #ff5252; font-weight: bold; border-left: 3px solid #ff5252; }
+        .close-card { position: absolute; top: 10px; right: 10px; color: #888; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <header>
-    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.7.0 (個別非表示解除)</small></h2>
+    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.9.0 (敵同盟管理&サマリー)</small></h2>
     <div class="clock-box">
-        <div>JST: <span id="jst">--:--:--</span></div>
-        <div>UTC: <span id="utc">--:--:--</span></div>
+        <div id="jst">JST: --</div>
+        <div id="utc">UTC: --</div>
     </div>
 </header>
 
 <div class="controls">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div class="io-section">
-            <button class="btn btn-io" onclick="exportData()">データ保存</button>
-            <button class="btn btn-io" onclick="document.getElementById('import-file').click()">読込</button>
-            <input type="file" id="import-file" style="display:none" onchange="importData(event)">
-        </div>
-        <button class="btn" style="font-size:0.75rem;" onclick="resetHiddenAll()">すべての非表示を戻す</button>
+    <div class="io-section">
+        <button class="btn" style="background:#4527a0" onclick="exportData()">保存</button>
+        <button class="btn" style="background:#4527a0" onclick="document.getElementById('import-file').click()">読込</button>
+        <button class="btn" style="background:#00897b" onclick="shareURL()">URL共有</button>
+        <button class="btn" style="font-size:0.7rem; margin-left:auto" onclick="resetHiddenAll()">全非表示解除</button>
+        <input type="file" id="import-file" style="display:none" onchange="importData(event)">
     </div>
     <div id="filter-container" class="filter-group"></div>
 </div>
 
 <div class="station-grid" id="station-list"></div>
 
+<div class="summary-panel" id="summary-panel">
+    <div class="summary-header">
+        <strong style="color:var(--accent)">⏳ 終了間近サマリー (72時間保護)</strong>
+        <button class="btn" style="font-size:0.7rem; background:#1565c0" onclick="copySummaryText()">テキストとしてコピー</button>
+    </div>
+    <div class="summary-list" id="summary-list"></div>
+</div>
+
 <script>
 const MASTER_DATA = {
-    "construction": { "name": "建築", "color": "#FF5252", "coords": [{"x": 1068, "y": 138, "lv": 1}, {"x": 537, "y": 138, "lv": 1}, {"x": 138, "y": 138, "lv": 1}, {"x": 138, "y": 666, "lv": 1}, {"x": 138, "y": 1038, "lv": 1}, {"x": 666, "y": 1068, "lv": 1}, {"x": 1068, "y": 567, "lv": 1}, {"x": 1068, "y": 1068, "lv": 1}, {"x": 486, "y": 327, "lv": 3}, {"x": 768, "y": 867, "lv": 3}, {"x": 867, "y": 567, "lv": 3}, {"x": 327, "y": 666, "lv": 3}]},
-    "defense": { "name": "防御", "color": "#448AFF", "coords": [{"x": 666, "y": 138, "lv": 2}, {"x": 438, "y": 267, "lv": 2}, {"x": 138, "y": 537, "lv": 2}, {"x": 237, "y": 768, "lv": 2}, {"x": 537, "y": 1038, "lv": 2}, {"x": 738, "y": 957, "lv": 2}, {"x": 1068, "y": 666, "lv": 2}, {"x": 957, "y": 438, "lv": 2}, {"x": 816, "y": 717, "lv": 4}, {"x": 387, "y": 717, "lv": 4}, {"x": 588, "y": 327, "lv": 4}]},
-    "tech": { "name": "技術", "color": "#FFEB3B", "coords": [{"x": 957, "y": 237, "lv": 1}, {"x": 666, "y": 267, "lv": 1}, {"x": 237, "y": 237, "lv": 1}, {"x": 267, "y": 537, "lv": 1}, {"x": 237, "y": 957, "lv": 1}, {"x": 537, "y": 936, "lv": 1}, {"x": 936, "y": 537, "lv": 1}, {"x": 957, "y": 957, "lv": 1}, {"x": 867, "y": 327, "lv": 3}, {"x": 327, "y": 327, "lv": 3}, {"x": 327, "y": 867, "lv": 3}, {"x": 867, "y": 867, "lv": 3}]},
-    "weapon": { "name": "武器", "color": "#E040FB", "coords": [{"x": 867, "y": 138, "lv": 2}, {"x": 366, "y": 138, "lv": 2}, {"x": 138, "y": 438, "lv": 2}, {"x": 138, "y": 867, "lv": 2}, {"x": 438, "y": 1068, "lv": 2}, {"x": 1068, "y": 327, "lv": 2}, {"x": 1068, "y": 867, "lv": 2}, {"x": 867, "y": 1068, "lv": 2}, {"x": 816, "y": 486, "lv": 4}, {"x": 387, "y": 486, "lv": 4}, {"x": 588, "y": 867, "lv": 4}]},
-    "gathering": { "name": "採取", "color": "#4CAF50", "coords": [{"x": 957, "y": 138, "lv": 1}, {"x": 537, "y": 87, "lv": 1}, {"x": 138, "y": 237, "lv": 1}, {"x": 87, "y": 666, "lv": 1}, {"x": 267, "y": 1068, "lv": 1}, {"x": 636, "y": 1137, "lv": 1}, {"x": 1137, "y": 567, "lv": 1}, {"x": 1068, "y": 936, "lv": 1}]},
-    "production": { "name": "生産", "color": "#FF9800", "coords": [{"x": 1068, "y": 237, "lv": 1}, {"x": 768, "y": 138, "lv": 1}, {"x": 237, "y": 138, "lv": 1}, {"x": 138, "y": 327, "lv": 1}, {"x": 138, "y": 957, "lv": 1}, {"x": 327, "y": 1038, "lv": 1}, {"x": 1068, "y": 747, "lv": 1}, {"x": 957, "y": 1068, "lv": 1}]},
-    "training": { "name": "訓練", "color": "#795548", "coords": [{"x": 237, "y": 486, "lv": 2}, {"x": 138, "y": 747, "lv": 2}, {"x": 486, "y": 957, "lv": 2}, {"x": 768, "y": 1038, "lv": 2}, {"x": 957, "y": 747, "lv": 2}, {"x": 1068, "y": 486, "lv": 2}, {"x": 486, "y": 138, "lv": 2}, {"x": 768, "y": 237, "lv": 2}]},
-    "expedition": { "name": "遠征", "color": "#607D8B", "coords": [{"x": 768, "y": 327, "lv": 3}, {"x": 327, "y": 567, "lv": 3}, {"x": 486, "y": 867, "lv": 3}, {"x": 867, "y": 666, "lv": 3}]}
+    "construction": { "name": "建築", "color": "#FF5252", "coords": [{"x": 1068, "y": 138, "lv": 1}, {"x": 486, "y": 327, "lv": 3}] },
+    "defense": { "name": "防御", "color": "#448AFF", "coords": [{"x": 666, "y": 138, "lv": 2}, {"x": 816, "y": 717, "lv": 4}] },
+    "tech": { "name": "技術", "color": "#FFEB3B", "coords": [{"x": 957, "y": 237, "lv": 1}, {"x": 867, "y": 327, "lv": 3}] },
+    "weapon": { "name": "武器", "color": "#E040FB", "coords": [{"x": 867, "y": 138, "lv": 2}, {"x": 816, "y": 486, "lv": 4}] },
+    "gathering": { "name": "採取", "color": "#4CAF50", "coords": [{"x": 957, "y": 138, "lv": 1}] },
+    "production": { "name": "生産", "color": "#FF9800", "coords": [{"x": 1068, "y": 237, "lv": 1}] },
+    "training": { "name": "訓練", "color": "#795548", "coords": [{"x": 237, "y": 486, "lv": 2}, {"x": 366, "y": 267, "lv": 1}] },
+    "expedition": { "name": "遠征", "color": "#607D8B", "coords": [{"x": 768, "y": 327, "lv": 3}, {"x": 537, "y": 267, "lv": 2}] },
+    "refining": { "name": "精錬", "color": "#00BCD4", "coords": [{"x": 666, "y": 588, "lv": 4}, {"x": 462, "y": 588, "lv": 5}] }
 };
 
 const FILTER_LIST = [];
@@ -74,50 +83,37 @@ Object.entries(MASTER_DATA).forEach(([typeKey, val]) => {
     lvs.forEach(lv => FILTER_LIST.push({ key: `${typeKey}-${lv}`, type: typeKey, lv: lv, name: `${val.name} Lv.${lv}`, color: val.color }));
 });
 
-let userState = { active: ["construction-1"], timers: {}, hidden: [] };
+// enemyFlag: { id: true/false } を追加
+let userState = { active: [], timers: {}, hidden: [], enemyFlags: {} };
 const DUR = 72 * 60 * 60 * 1000;
 const STORAGE_KEY = 'wos_station_manager_data';
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
 function load() {
-    const s = localStorage.getItem(STORAGE_KEY);
-    if(s) userState = JSON.parse(s);
+    const params = new URLSearchParams(window.location.search);
+    const sharedData = params.get('d');
+    if (sharedData && confirm("共有データを読み込みますか？")) {
+        try { userState = JSON.parse(decodeURIComponent(atob(sharedData))); save(); } catch(e){}
+    } else {
+        const s = localStorage.getItem(STORAGE_KEY);
+        if(s) userState = JSON.parse(s);
+        if(!userState.enemyFlags) userState.enemyFlags = {};
+        if(userState.active.length === 0) userState.active = FILTER_LIST.map(f => f.key);
+    }
 }
 
 function render() {
     const f = document.getElementById('filter-container');
     f.innerHTML = '';
     FILTER_LIST.forEach(item => {
-        const wrap = document.createElement('div');
-        wrap.className = 'filter-item';
-
+        const wrap = document.createElement('div'); wrap.className = 'filter-item';
         const btn = document.createElement('button');
         const act = userState.active.includes(item.key);
         btn.className = `filter-btn ${act?'active':''}`;
         btn.style.backgroundColor = act ? item.color : '#333';
         btn.innerText = item.name;
-        btn.onclick = () => {
-            userState.active = act ? userState.active.filter(x=>x!==item.key) : [...userState.active, item.key];
-            save(); render();
-        };
-
-        const res = document.createElement('button');
-        res.className = 'filter-reset';
-        res.innerHTML = '↺';
-        res.title = `${item.name}の非表示をすべて戻す`;
-        res.onclick = (e) => {
-            e.stopPropagation();
-            if(confirm(`${item.name} の非表示を解除しますか？`)) {
-                // そのタイプとLvに合致するIDのみ削除
-                const prefix = `${item.type}-${item.lv}-`;
-                userState.hidden = userState.hidden.filter(id => !id.startsWith(prefix));
-                save(); render();
-            }
-        };
-
-        wrap.appendChild(btn);
-        wrap.appendChild(res);
-        f.appendChild(wrap);
+        btn.onclick = () => { userState.active = act ? userState.active.filter(x=>x!==item.key) : [...userState.active, item.key]; save(); render(); };
+        wrap.appendChild(btn); f.appendChild(wrap);
     });
 
     const l = document.getElementById('station-list');
@@ -127,32 +123,43 @@ function render() {
         MASTER_DATA[item.type].coords.filter(c => c.lv === item.lv).forEach((c, i) => {
             const id = `${item.type}-${item.lv}-${i}`;
             if (userState.hidden.includes(id)) return;
-
-            const card = document.createElement('div');
-            card.className = 'station-card';
-            card.style.borderLeftColor = item.color;
+            const isEnemy = !!userState.enemyFlags[id];
             const t = userState.timers[id];
             
-            let content = `<span class="close-card" onclick="hideCard('${id}')">&times;</span>
-                           <div style="font-weight:bold">${item.name}</div>
-                           <div style="color:#888; font-size:0.75rem">座標: (${c.x}, ${c.y})</div>`;
+            const card = document.createElement('div');
+            card.className = `station-card ${isEnemy?'enemy':''}`;
+            if(!isEnemy) card.style.borderLeftColor = item.color;
+
+            let content = `
+                <span class="close-card" onclick="hideCard('${id}')">&times;</span>
+                <button class="btn-enemy-toggle" onclick="toggleEnemy('${id}')">${isEnemy?'🚩 敵同盟が保持':'🏠 自同盟が保持'}</button>
+                <div style="font-weight:bold">${item.name} <small>(${c.x}, ${c.y})</small></div>
+            `;
 
             if (t) {
-                const ed = new Date(t + DUR);
-                content += `<div class="end-time">終了予定: ${ed.getMonth()+1}/${ed.getDate()} ${ed.getHours().toString().padStart(2,'0')}:${ed.getMinutes().toString().padStart(2,'0')}</div>
-                            <div class="countdown" id="t-${id}">--:--:--</div>
-                            <div class="adjust-group">
-                                <button class="btn btn-sync" onclick="syncTimer('${id}')">残り同期</button>
-                                <button class="btn btn-reset" style="margin-left:auto" onclick="reset('${id}')">解除</button>
-                            </div>`;
+                const label = isEnemy ? "争奪開始まで" : "保護終了まで";
+                content += `
+                    <div style="font-size:0.7rem; margin-top:5px; opacity:0.8">${label}</div>
+                    <div class="countdown" id="t-${id}">--:--:--</div>
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn" style="background:#0277bd" onclick="syncTimer('${id}')">同期</button>
+                        <button class="btn" style="background:#c62828; margin-left:auto;" onclick="reset('${id}')">解除</button>
+                    </div>
+                `;
             } else {
-                content += `<button class="btn btn-start" onclick="start('${id}')">保護開始 (72h)</button>`;
+                content += `<button class="btn" style="background:#2e7d32; width:100%; margin-top:10px;" onclick="start('${id}')">保護開始 (72h)</button>`;
             }
             card.innerHTML = content;
             l.appendChild(card);
         });
     });
 }
+
+function toggleEnemy(id) { userState.enemyFlags[id] = !userState.enemyFlags[id]; save(); render(); }
+function start(id) { userState.timers[id] = Date.now(); save(); render(); }
+function reset(id) { if(confirm('解除しますか？')) { delete userState.timers[id]; save(); render(); } }
+function hideCard(id) { userState.hidden.push(id); save(); render(); }
+function resetHiddenAll() { userState.hidden = []; save(); render(); }
 
 function syncTimer(id) {
     const input = prompt("残り時間を入力 (例: 1d 09:11:27)", "");
@@ -171,37 +178,84 @@ function syncTimer(id) {
     save(); render();
 }
 
-function start(id) { userState.timers[id] = Date.now(); save(); render(); }
-function reset(id) { if(confirm('解除しますか？')) { delete userState.timers[id]; save(); render(); } }
-function hideCard(id) { userState.hidden.push(id); save(); render(); }
-function resetHiddenAll() { if(confirm('すべての非表示を解除しますか？')) { userState.hidden = []; save(); render(); } }
+function updateSummary() {
+    const list = document.getElementById('summary-list');
+    const timers = [];
+    Object.keys(userState.timers).forEach(id => {
+        const diff = (userState.timers[id] + DUR) - Date.now();
+        const [type, lv] = id.split('-');
+        const name = `${MASTER_DATA[type].name} Lv.${lv}`;
+        const isEnemy = !!userState.enemyFlags[id];
+        timers.push({ id, name, diff, isEnemy, endTime: userState.timers[id] + DUR });
+    });
+
+    timers.sort((a, b) => a.diff - b.diff);
+    list.innerHTML = timers.map(t => {
+        const h = Math.floor(Math.max(0, t.diff)/3600000);
+        const m = Math.floor((Math.max(0, t.diff)%3600000)/60000);
+        const warnClass = t.diff < 3600000 ? 'warn' : ''; // 1時間未満で赤く
+        return `<div class="summary-item ${warnClass}">
+            <span>${t.isEnemy?'[敵]':'[自]'} ${t.name}</span>
+            <span>残り ${h}h ${m}m</span>
+        </div>`;
+    }).join('');
+}
+
+function copySummaryText() {
+    const timers = [];
+    Object.keys(userState.timers).forEach(id => {
+        const diff = (userState.timers[id] + DUR) - Date.now();
+        const [type, lv] = id.split('-');
+        const name = `${MASTER_DATA[type].name} Lv.${lv}`;
+        const isEnemy = !!userState.enemyFlags[id];
+        const ed = new Date(userState.timers[id] + DUR);
+        const endStr = `${ed.getMonth()+1}/${ed.getDate()} ${ed.getHours()}:${ed.getMinutes().toString().padStart(2,'0')}`;
+        timers.push({ name, diff, isEnemy, endStr });
+    });
+    timers.sort((a, b) => a.diff - b.diff);
+    
+    let text = "【ステーション保護状況】\n";
+    timers.forEach(t => {
+        const h = Math.floor(Math.max(0, t.diff)/3600000);
+        const m = Math.floor((Math.max(0, t.diff)%3600000)/60000);
+        text += `${t.isEnemy?'●敵':'○自'} ${t.name}: 残り ${h}h ${m}m (終了: ${t.endStr})\n`;
+    });
+    
+    navigator.clipboard.writeText(text).then(() => alert("サマリーをコピーしました。"));
+}
 
 function tick() {
     const n = new Date();
-    document.getElementById('jst').innerText = n.toLocaleString('ja-JP');
-    document.getElementById('utc').innerText = n.toISOString().replace('T',' ').substring(0,19);
+    document.getElementById('jst').innerText = 'JST: ' + n.toLocaleString('ja-JP');
+    document.getElementById('utc').innerText = 'UTC: ' + n.toISOString().replace('T',' ').substring(0,19);
     Object.keys(userState.timers).forEach(id => {
         const el = document.getElementById(`t-${id}`);
         if(!el) return;
         const diff = (userState.timers[id] + DUR) - Date.now();
-        if(diff <= 0) { el.innerText = "保護終了"; el.style.color = "#888"; }
+        if(diff <= 0) { el.innerText = "終了"; el.style.color = "#888"; }
         else {
             const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
             el.innerText = `${h}h ${m}m ${s}s`;
         }
     });
+    updateSummary();
 }
 
+function shareURL() {
+    const base64 = btoa(encodeURIComponent(JSON.stringify(userState)));
+    const url = new URL(window.location.href);
+    url.searchParams.set('d', base64);
+    navigator.clipboard.writeText(url.href).then(() => alert("共有URLをコピーしました。"));
+}
 function exportData() {
-    const blob = new Blob([JSON.stringify(userState, null, 2)], {type: 'application/json'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `wos_station_backup.json`; a.click();
+    const blob = new Blob([JSON.stringify(userState)], {type: 'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `wos_data.json`; a.click();
 }
 function importData(e) {
     const reader = new FileReader();
-    reader.onload = (event) => { try { userState = JSON.parse(event.target.result); save(); render(); } catch(err) { alert("Invalid file"); } };
+    reader.onload = (event) => { userState = JSON.parse(event.target.result); save(); render(); };
     reader.readAsText(e.target.files[0]);
 }
-
 window.onload = () => { load(); render(); setInterval(tick, 1000); };
 </script>
 </body>
