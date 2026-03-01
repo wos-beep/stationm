@@ -3,28 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>工程ステーション管理 v1.1.0</title>
+    <title>工程ステーション管理 v1.3.0</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --brd: #333; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 20px; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 20px; line-height: 1.4; }
         header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--brd); padding-bottom: 10px; margin-bottom: 20px; }
         .clock-box { background: #000; padding: 10px; border: 1px solid var(--accent); border-radius: 5px; font-family: monospace; font-size: 0.9rem; }
         .controls { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        .filter-group { display: flex; gap: 8px; flex-wrap: wrap; }
-        .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
-        .station-card { background: var(--card); border: 1px solid var(--brd); border-left: 6px solid #ccc; padding: 15px; border-radius: 6px; }
-        .countdown { font-size: 1.4rem; font-weight: bold; color: #ff5252; margin: 10px 0; font-family: monospace; }
-        .btn { cursor: pointer; padding: 8px 12px; border: none; border-radius: 4px; background: #444; color: white; }
-        .btn-start { background: #2e7d32; width: 100%; font-weight: bold; margin-top: 10px; }
-        .btn-reset { background: #c62828; font-size: 0.8rem; }
-        .filter-btn { opacity: 0.4; transition: 0.3s; }
-        .filter-btn.active { opacity: 1; border: 1px solid #fff; }
+        .filter-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
+        .station-card { background: var(--card); border: 1px solid var(--brd); border-left: 6px solid #ccc; padding: 15px; border-radius: 6px; position: relative; }
+        .end-time { font-size: 0.85rem; color: #bb86fc; margin-top: 5px; font-weight: bold; }
+        .countdown { font-size: 1.4rem; font-weight: bold; color: #ff5252; margin: 5px 0; font-family: monospace; }
+        .btn { cursor: pointer; padding: 6px 10px; border: none; border-radius: 4px; background: #444; color: white; font-size: 0.85rem; }
+        .btn-start { background: #2e7d32; width: 100%; font-weight: bold; margin-top: 10px; height: 40px; }
+        .btn-reset { background: #c62828; font-size: 0.75rem; }
+        .adjust-group { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+        .btn-adj { background: #1565c0; font-size: 0.7rem; padding: 3px 6px; }
+        .close-card { position: absolute; top: 10px; right: 10px; color: #888; cursor: pointer; font-size: 1.2rem; }
     </style>
 </head>
 <body>
 
 <header>
-    <h2>工程ステーション管理 <small style="font-size:0.6em; color:#888;">v1.1.0 (画像データ反映版)</small></h2>
+    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.3.0 手動同期対応</small></h2>
     <div class="clock-box">
         <div>JST: <span id="jst">--:--:--</span></div>
         <div>UTC: <span id="utc">--:--:--</span></div>
@@ -32,14 +34,17 @@
 </header>
 
 <div class="controls">
-    <div style="margin-bottom:10px; font-size:0.9rem;">表示する施設を選択:</div>
+    <div style="margin-bottom:10px; font-size:0.85rem; display:flex; justify-content:space-between;">
+        <span>表示切替:</span>
+        <button class="btn" style="font-size:0.75rem;" onclick="resetHidden()">非表示を戻す</button>
+    </div>
     <div id="filter-container" class="filter-group"></div>
 </div>
 
 <div class="station-grid" id="station-list"></div>
 
 <script>
-// 画像（image_a2de56.jpg）から抽出した完全なマスターデータ
+// 画像に基づいた最新座標データ
 const MASTER_DATA = {
     "construction": { "name": "建築", "color": "#FF5252", "coords": [
         {"x": 1068, "y": 138, "lv": 1}, {"x": 537, "y": 138, "lv": 1}, {"x": 138, "y": 138, "lv": 1}, {"x": 138, "y": 666, "lv": 1}, {"x": 138, "y": 1038, "lv": 1}, {"x": 666, "y": 1068, "lv": 1}, {"x": 1068, "y": 567, "lv": 1}, {"x": 1068, "y": 1068, "lv": 1},
@@ -71,11 +76,11 @@ const MASTER_DATA = {
     ]}
 };
 
-let userState = { active: ["construction"], timers: {} };
+let userState = { active: ["construction"], timers: {}, hidden: [] };
 const DUR = 72 * 60 * 60 * 1000;
 
-function save() { localStorage.setItem('wos_v110', JSON.stringify(userState)); }
-function load() { const s = localStorage.getItem('wos_v110'); if(s) userState = JSON.parse(s); }
+function save() { localStorage.setItem('wos_v130', JSON.stringify(userState)); }
+function load() { const s = localStorage.getItem('wos_v130'); if(s) userState = JSON.parse(s); }
 
 function updateClocks() {
     const n = new Date();
@@ -105,22 +110,56 @@ function render() {
     userState.active.forEach(k => {
         MASTER_DATA[k].coords.forEach((c, i) => {
             const id = `${k}-${i}`;
+            if (userState.hidden.includes(id)) return;
+
             const card = document.createElement('div');
             card.className = 'station-card';
             card.style.borderLeftColor = MASTER_DATA[k].color;
             const t = userState.timers[id];
-            card.innerHTML = `
+            
+            let content = `
+                <span class="close-card" onclick="hideCard('${id}')">&times;</span>
                 <div style="font-weight:bold">${MASTER_DATA[k].name} Lv.${c.lv}</div>
-                <div style="color:#888; font-size:0.8rem">座標: (${c.x}, ${c.y})</div>
-                ${t ? `<div class="countdown" id="t-${id}">--:--:--</div><button class="btn btn-reset" onclick="reset('${id}')">リセット</button>` : `<button class="btn btn-start" onclick="start('${id}')">保護開始</button>`}
+                <div style="color:#888; font-size:0.75rem">座標: (${c.x}, ${c.y})</div>
             `;
+
+            if (t) {
+                const ed = new Date(t + DUR);
+                const endStr = `${ed.getMonth()+1}/${ed.getDate()} ${ed.getHours().toString().padStart(2,'0')}:${ed.getMinutes().toString().padStart(2,'0')}`;
+                content += `
+                    <div class="end-time">終了: ${endStr}</div>
+                    <div class="countdown" id="t-${id}">--:--:--</div>
+                    <div class="adjust-group">
+                        <button class="btn btn-adj" onclick="adj('${id}', 3600000)">+1h</button>
+                        <button class="btn btn-adj" onclick="adj('${id}', -3600000)">-1h</button>
+                        <button class="btn btn-adj" onclick="adj('${id}', 600000)">+10m</button>
+                        <button class="btn btn-adj" onclick="adj('${id}', -600000)">-10m</button>
+                        <button class="btn btn-adj" onclick="adj('${id}', 60000)">+1m</button>
+                        <button class="btn btn-reset" style="margin-left:auto" onclick="reset('${id}')">解除</button>
+                    </div>
+                `;
+            } else {
+                content += `<button class="btn btn-start" onclick="start('${id}')">保護開始 (72h)</button>`;
+            }
+            card.innerHTML = content;
             l.appendChild(card);
         });
     });
 }
 
 function start(id) { userState.timers[id] = Date.now(); save(); render(); }
-function reset(id) { if(confirm('リセットしますか？')) { delete userState.timers[id]; save(); render(); } }
+function reset(id) { if(confirm('タイマーを停止しますか？')) { delete userState.timers[id]; save(); render(); } }
+function hideCard(id) { userState.hidden.push(id); save(); render(); }
+function resetHidden() { userState.hidden = []; save(); render(); }
+
+// 時間の微調整 (ms: ミリ秒)
+function adj(id, ms) {
+    if (userState.timers[id]) {
+        userState.timers[id] += ms;
+        save();
+        render();
+    }
+}
 
 function tick() {
     updateClocks();
@@ -128,7 +167,7 @@ function tick() {
         const el = document.getElementById(`t-${id}`);
         if(!el) return;
         const diff = (userState.timers[id] + DUR) - Date.now();
-        if(diff <= 0) { el.innerText = "終了"; el.style.color = "#888"; }
+        if(diff <= 0) { el.innerText = "保護終了"; el.style.color = "#888"; }
         else {
             const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
             el.innerText = `${h}h ${m}m ${s}s`;
