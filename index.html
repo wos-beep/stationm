@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>工程ステーション管理 v2.4.0 (URL短縮版)</title>
+    <title>工程ステーション管理 v2.5.0 (極限短縮)</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --enemy: #ff5252; --own: #448AFF; }
         body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 15px; padding-bottom: 240px; font-size: 14px; }
@@ -29,7 +29,7 @@
 
 <div class="controls">
     <button class="btn btn-add" onclick="showModal()">＋ 追加</button>
-    <button class="btn btn-share" onclick="shareURL()">短縮リンクを発行</button>
+    <button class="btn btn-share" onclick="shareURL()">短縮リンク発行</button>
     <div style="flex-grow: 1;"></div>
     <button class="btn" style="background:#4527a0" onclick="exportData()">保存(JSON)</button>
     <button class="btn" onclick="document.getElementById('import-file').click()">読込</button>
@@ -65,7 +65,6 @@
 </div>
 
 <script>
-// --- MASTER_DATA は前回と同じ（省略せず保持） ---
 const MASTER_DATA = {
     "construction": { "name": "建築", "coords": [{x:1068,y:138,lv:1},{x:537,y:138,lv:1},{x:138,y:138,lv:1},{x:138,y:666,lv:1},{x:138,y:1038,lv:1},{x:666,y:1068,lv:1},{x:1068,y:567,lv:1},{x:1068,y:1068,lv:1},{x:486,y:327,lv:3},{x:768,y:867,lv:3},{x:867,y:567,lv:3},{x:327,y:666,lv:3}] },
     "defense": { "name": "防御", "coords": [{x:666,y:138,lv:2},{x:438,y:267,lv:2},{x:138,y:537,lv:2},{x:237,y:768,lv:2},{x:537,y:1038,lv:2},{x:738,y:957,lv:2},{x:1068,y:666,lv:2},{x:957,y:438,lv:2},{x:816,y:717,lv:4},{x:387,y:717,lv:4},{x:588,y:327,lv:4}] },
@@ -85,83 +84,75 @@ Object.entries(MASTER_DATA).forEach(([k, cat]) => {
 });
 
 let userState = { selectedIds: [], timers: {}, modes: {} };
-const STORAGE_KEY = 'wos_v240_master';
+const STORAGE_KEY = 'wos_v250_master';
 const DUR = 72 * 60 * 60 * 1000;
+const EPOCH = 1735689600; // 2025-01-01 基準
 
-// 短縮ロジック用のマップ
-const SHORT_KEYS = { construction:'c', defense:'d', tech:'t', weapon:'w', gathering:'g', production:'p', training:'tr', expedition:'e' };
-const LONG_KEYS = Object.fromEntries(Object.entries(SHORT_KEYS).map(([k,v])=>[v,k]));
-
-function compressData(state) {
-    const compact = { s: [], t: {}, m: {} };
-    state.selectedIds.forEach(id => {
-        const parts = id.split('-');
-        const shortId = `${SHORT_KEYS[parts[0]]}${parts[1]}_${parts[2]}`;
-        compact.s.push(shortId);
-        if (state.timers[id]) compact.t[shortId] = Math.floor(state.timers[id] / 1000); // 秒単位に
-        if (state.modes[id] && state.modes[id] !== 'none') compact.m[shortId] = state.modes[id] === 'own' ? 1 : 2;
-    });
-    return compact;
-}
-
-function decompressData(compact) {
-    const state = { selectedIds: [], timers: {}, modes: {} };
-    compact.s.forEach(sid => {
-        const match = sid.match(/([a-z]+)(\d+)_(\d+)/);
-        if (!match) return;
-        const id = `${LONG_KEYS[match[1]]}-${match[2]}-${match[3]}`;
-        state.selectedIds.push(id);
-        if (compact.t[sid]) state.timers[id] = compact.t[sid] * 1000;
-        if (compact.m[sid]) state.modes[id] = compact.m[sid] === 1 ? 'own' : 'enemy';
-        else state.modes[id] = 'none';
-    });
-    return state;
-}
-
+// 極限圧縮ロジック: インデックス.モード.時刻(36進数) を連結
 function shareURL() {
-    const compressed = compressData(userState);
-    const b64 = btoa(JSON.stringify(compressed)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const url = window.location.origin + window.location.pathname + "?s=" + b64;
-    navigator.clipboard.writeText(url).then(() => alert("URLを短縮してコピーしました。"));
+    if (!userState.selectedIds.length) { alert("データがありません"); return; }
+    const parts = userState.selectedIds.map(id => {
+        const idx = ALL_STATIONS.findIndex(s => s.id === id);
+        const mode = userState.modes[id] === 'own' ? 1 : (userState.modes[id] === 'enemy' ? 2 : 0);
+        const time = userState.timers[id] ? Math.floor(userState.timers[id]/1000 - EPOCH).toString(36) : "";
+        return `${idx.toString(36)}.${mode}.${time}`;
+    });
+    const url = window.location.origin + window.location.pathname + "?v=" + parts.join('_');
+    navigator.clipboard.writeText(url).then(() => alert("極限短縮URLをコピーしました！"));
 }
 
 function load() {
     const params = new URLSearchParams(window.location.search);
-    const sParam = params.get('s'); // 短縮版
-    const dParam = params.get('d'); // 旧バージョン互換
+    const v = params.get('v'); // v2.5
+    const s = params.get('s'); // v2.4
     
-    if (sParam) {
+    if (v) {
         try {
-            const decoded = atob(sParam.replace(/-/g, '+').replace(/_/g, '/'));
-            userState = decompressData(JSON.parse(decoded));
-            save(); window.history.replaceState({}, '', location.pathname);
-        } catch(e) { console.error("URL Load Error"); }
-    } else if (dParam) {
+            const newState = { selectedIds: [], timers: {}, modes: {} };
+            v.split('_').forEach(p => {
+                const [idx36, mode, time36] = p.split('.');
+                const station = ALL_STATIONS[parseInt(idx36, 36)];
+                if (!station) return;
+                newState.selectedIds.push(station.id);
+                newState.modes[station.id] = mode == 1 ? 'own' : (mode == 2 ? 'enemy' : 'none');
+                if (time36) newState.timers[station.id] = (parseInt(time36, 36) + EPOCH) * 1000;
+            });
+            userState = newState; save(); window.history.replaceState({}, '', location.pathname);
+        } catch(e) { console.error("Restore Error", e); }
+    } else if (s) { // v2.4互換用
         try {
-            userState = JSON.parse(decodeURIComponent(atob(dParam)));
-            save(); window.history.replaceState({}, '', location.pathname);
+            const SHORT_KEYS = { construction:'c', defense:'d', tech:'t', weapon:'w', gathering:'g', production:'p', training:'tr', expedition:'e' };
+            const LONG_KEYS = Object.fromEntries(Object.entries(SHORT_KEYS).map(([k,v])=>[v,k]));
+            const compact = JSON.parse(atob(s.replace(/-/g, '+').replace(/_/g, '/')));
+            const newState = { selectedIds: [], timers: {}, modes: {} };
+            compact.s.forEach(sid => {
+                const match = sid.match(/([a-z]+)(\d+)_(\d+)/);
+                if (!match) return;
+                const id = `${LONG_KEYS[match[1]]}-${match[2]}-${match[3]}`;
+                newState.selectedIds.push(id);
+                if (compact.t[sid]) newState.timers[id] = compact.t[sid] * 1000;
+                newState.modes[id] = compact.m[sid] === 1 ? 'own' : (compact.m[sid] === 2 ? 'enemy' : 'none');
+            });
+            userState = newState; save(); window.history.replaceState({}, '', location.pathname);
         } catch(e) {}
     } else {
-        const s = localStorage.getItem(STORAGE_KEY);
-        if(s) userState = JSON.parse(s);
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if(saved) userState = JSON.parse(saved);
     }
-    
     const tSel = document.getElementById('f-type');
     Object.entries(MASTER_DATA).forEach(([k, v]) => tSel.innerHTML += `<option value="${k}">${v.name}</option>`);
     render();
 }
 
-// --- 以下、既存のUIロジック（v2.3.0と同じ） ---
+// UIロジック
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
 function onTypeChange() {
-    const type = document.getElementById('f-type').value;
-    const lvSel = document.getElementById('f-lv');
-    const prevLv = lvSel.value;
+    const type = document.getElementById('f-type').value, lvSel = document.getElementById('f-lv'), prevLv = lvSel.value;
     lvSel.innerHTML = '<option value="">全Lv</option>';
     if (type) {
         const lvs = [...new Set(MASTER_DATA[type].coords.map(c => c.lv))].sort();
         lvs.forEach(l => lvSel.innerHTML += `<option value="${l}">Lv.${l}</option>`);
-        if (!lvs.includes(parseInt(prevLv))) lvSel.value = ""; else lvSel.value = prevLv;
+        lvSel.value = lvs.includes(parseInt(prevLv)) ? prevLv : "";
     }
     filterModal();
 }
@@ -169,14 +160,12 @@ function showModal() { document.getElementById('modal').style.display = 'block';
 function hideModal() { document.getElementById('modal').style.display = 'none'; }
 function filterModal() {
     const type = document.getElementById('f-type').value, lv = document.getElementById('f-lv').value, search = document.getElementById('f-search').value;
-    const list = document.getElementById('modal-list');
-    list.innerHTML = '';
+    const list = document.getElementById('modal-list'); list.innerHTML = '';
     ALL_STATIONS.filter(s => {
         const matchType = !type || s.typeKey === type, matchLv = !lv || s.lv == lv, matchSearch = !search || s.x == search || s.y == search, notAdded = !userState.selectedIds.includes(s.id);
         return matchType && matchLv && matchSearch && notAdded;
     }).forEach(s => {
-        const div = document.createElement('div');
-        div.className = 'modal-item';
+        const div = document.createElement('div'); div.className = 'modal-item';
         div.innerHTML = `<span><b>${s.typeName} Lv.${s.lv}</b> (${s.x}, ${s.y})</span><button class="btn btn-add" onclick="addStation('${s.id}')">追加</button>`;
         list.appendChild(div);
     });
@@ -184,13 +173,11 @@ function filterModal() {
 function addStation(id) { userState.selectedIds.push(id); userState.modes[id] = 'none'; save(); render(); filterModal(); }
 function removeStation(id) { if(confirm('解除しますか？')) { userState.selectedIds = userState.selectedIds.filter(x => x !== id); delete userState.timers[id]; delete userState.modes[id]; save(); render(); } }
 function render() {
-    const grid = document.getElementById('station-list');
-    grid.innerHTML = '';
+    const grid = document.getElementById('station-list'); grid.innerHTML = '';
     userState.selectedIds.forEach(id => {
         const s = ALL_STATIONS.find(x => x.id === id); if(!s) return;
         const mode = userState.modes[id] || 'none', t = userState.timers[id];
-        const card = document.createElement('div');
-        card.className = `station-card ${mode==='own'?'own':''} ${mode==='enemy'?'enemy':''}`;
+        const card = document.createElement('div'); card.className = `station-card ${mode==='own'?'own':''} ${mode==='enemy'?'enemy':''}`;
         card.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <div style="display:flex; gap:3px;">
@@ -210,7 +197,7 @@ function render() {
 }
 function setMode(id, m) { userState.modes[id] = m; save(); render(); }
 function startTimer(id) { userState.timers[id] = Date.now(); save(); render(); }
-function resetTimer(id) { if(confirm('解除しますか？')) { delete userState.timers[id]; save(); render(); } }
+function resetTimer(id) { if(confirm('リセットしますか？')) { delete userState.timers[id]; save(); render(); } }
 function sync(id) {
     const v = prompt("残り時間 (1d 09:11:27)"); if(!v) return;
     let s=0; const d=v.match(/(\d+)d/i); if(d) s+=d[1]*86400;
@@ -230,7 +217,7 @@ function tick() {
         if(!userState.timers[id]) return;
         const endTime = userState.timers[id] + DUR, diff = endTime - now;
         const el = document.getElementById(`t-${id}`), jstEl = document.getElementById(`jst-${id}`);
-        if(el) { el.innerText = diff<=0?"争奪中":`${Math.floor(diff/3600000)}h ${Math.floor((diff%3600000)/60000)}m ${Math.floor((diff%60000)/1000)}s`; el.style.color="#ff5252"; }
+        if(el) el.innerText = diff<=0?"争奪中":`${Math.floor(diff/3600000)}h ${Math.floor((diff%3600000)/60000)}m ${Math.floor((diff%60000)/1000)}s`;
         if(jstEl) jstEl.innerText = formatJST(new Date(endTime));
         const s = ALL_STATIONS.find(x => x.id === id); sum.push({ name: `${s.typeName} Lv.${s.lv}`, diff, mode: userState.modes[id], jst: formatJST(new Date(endTime)) });
     });
@@ -247,7 +234,7 @@ function copySummaryText() {
     const filtered = isAll ? items : items.filter(i => i.diff > 0 && i.diff <= 24 * 60 * 60 * 1000);
     if (!filtered.length) { alert("対象がありません。"); return; }
     filtered.forEach(i => txt += `${i.mode==='enemy'?'●敵':'○自'} ${i.name}: ${i.jst} (残 ${Math.floor(Math.max(0,i.diff)/3600000)}h ${Math.floor((Math.max(0,i.diff)%3600000)/60000)}m)\n`);
-    navigator.clipboard.writeText(txt).then(() => alert("サマリーをコピーしました。"));
+    navigator.clipboard.writeText(txt).then(() => alert("コピーしました。"));
 }
 function exportData() { const b = new Blob([JSON.stringify(userState)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `wos_backup.json`; a.click(); }
 function importData(e) { const r = new FileReader(); r.onload = (ev) => { try { userState = JSON.parse(ev.target.result); save(); render(); } catch(e){alert("失敗");} }; r.readAsText(e.target.files[0]); }
