@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>工程ステーション管理 v1.4.0</title>
+    <title>工程ステーション管理 v1.5.0</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --brd: #333; }
         body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 20px; line-height: 1.4; }
@@ -11,24 +11,23 @@
         .clock-box { background: #000; padding: 10px; border: 1px solid var(--accent); border-radius: 5px; font-family: monospace; font-size: 0.9rem; }
         .controls { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
         .filter-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
-        .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
+        .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; }
         .station-card { background: var(--card); border: 1px solid var(--brd); border-left: 6px solid #ccc; padding: 15px; border-radius: 6px; position: relative; }
         .end-time { font-size: 0.85rem; color: #bb86fc; margin-top: 5px; font-weight: bold; }
-        .countdown { font-size: 1.4rem; font-weight: bold; color: #ff5252; margin: 5px 0; font-family: monospace; }
+        .countdown { font-size: 1.6rem; font-weight: bold; color: #ff5252; margin: 5px 0; font-family: monospace; }
         .btn { cursor: pointer; padding: 6px 10px; border: none; border-radius: 4px; background: #444; color: white; font-size: 0.85rem; }
         .btn-start { background: #2e7d32; width: 100%; font-weight: bold; margin-top: 10px; height: 40px; }
+        .btn-sync { background: #0277bd; font-weight: bold; }
         .btn-reset { background: #c62828; font-size: 0.75rem; }
         .btn-io { background: #4527a0; font-size: 0.8rem; }
-        .adjust-group { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
-        .btn-adj { background: #1565c0; font-size: 0.7rem; padding: 3px 6px; }
+        .adjust-group { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
         .close-card { position: absolute; top: 10px; right: 10px; color: #888; cursor: pointer; font-size: 1.2rem; }
-        .io-section { margin-top: 20px; padding-top: 10px; border-top: 1px solid #444; display: flex; gap: 10px; }
     </style>
 </head>
 <body>
 
 <header>
-    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.4.0 (IO機能復旧)</small></h2>
+    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.5.0 秒単位同期</small></h2>
     <div class="clock-box">
         <div>JST: <span id="jst">--:--:--</span></div>
         <div>UTC: <span id="utc">--:--:--</span></div>
@@ -37,7 +36,7 @@
 
 <div class="controls">
     <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div class="io-section" style="margin:0; border:none; padding:0;">
+        <div class="io-section">
             <button class="btn btn-io" onclick="exportData()">データ保存(DL)</button>
             <button class="btn btn-io" onclick="document.getElementById('import-file').click()">データ読込</button>
             <input type="file" id="import-file" style="display:none" onchange="importData(event)">
@@ -50,62 +49,40 @@
 <div class="station-grid" id="station-list"></div>
 
 <script>
+// マスターデータ (画像座標反映済み)
 const MASTER_DATA = {
-    "construction": { "name": "建築", "color": "#FF5252", "coords": [
-        {"x": 1068, "y": 138, "lv": 1}, {"x": 537, "y": 138, "lv": 1}, {"x": 138, "y": 138, "lv": 1}, {"x": 138, "y": 666, "lv": 1}, {"x": 138, "y": 1038, "lv": 1}, {"x": 666, "y": 1068, "lv": 1}, {"x": 1068, "y": 567, "lv": 1}, {"x": 1068, "y": 1068, "lv": 1},
-        {"x": 486, "y": 327, "lv": 3}, {"x": 768, "y": 867, "lv": 3}, {"x": 867, "y": 567, "lv": 3}, {"x": 327, "y": 666, "lv": 3}
-    ]},
-    "defense": { "name": "防御", "color": "#448AFF", "coords": [
-        {"x": 666, "y": 138, "lv": 2}, {"x": 438, "y": 267, "lv": 2}, {"x": 138, "y": 537, "lv": 2}, {"x": 237, "y": 768, "lv": 2}, {"x": 537, "y": 1038, "lv": 2}, {"x": 738, "y": 957, "lv": 2}, {"x": 1068, "y": 666, "lv": 2}, {"x": 957, "y": 438, "lv": 2},
-        {"x": 816, "y": 717, "lv": 4}, {"x": 387, "y": 717, "lv": 4}, {"x": 588, "y": 327, "lv": 4}
-    ]},
-    "tech": { "name": "技術", "color": "#FFEB3B", "coords": [
-        {"x": 957, "y": 237, "lv": 1}, {"x": 666, "y": 267, "lv": 1}, {"x": 237, "y": 237, "lv": 1}, {"x": 267, "y": 537, "lv": 1}, {"x": 237, "y": 957, "lv": 1}, {"x": 537, "y": 936, "lv": 1}, {"x": 936, "y": 537, "lv": 1}, {"x": 957, "y": 957, "lv": 1},
-        {"x": 867, "y": 327, "lv": 3}, {"x": 327, "y": 327, "lv": 3}, {"x": 327, "y": 867, "lv": 3}, {"x": 867, "y": 867, "lv": 3}
-    ]},
-    "weapon": { "name": "武器", "color": "#E040FB", "coords": [
-        {"x": 867, "y": 138, "lv": 2}, {"x": 366, "y": 138, "lv": 2}, {"x": 138, "y": 438, "lv": 2}, {"x": 138, "y": 867, "lv": 2}, {"x": 438, "y": 1068, "lv": 2}, {"x": 1068, "y": 327, "lv": 2}, {"x": 1068, "y": 867, "lv": 2}, {"x": 867, "y": 1068, "lv": 2},
-        {"x": 816, "y": 486, "lv": 4}, {"x": 387, "y": 486, "lv": 4}, {"x": 588, "y": 867, "lv": 4}
-    ]},
-    "gathering": { "name": "採取", "color": "#4CAF50", "coords": [
-        {"x": 957, "y": 138, "lv": 1}, {"x": 537, "y": 87, "lv": 1}, {"x": 138, "y": 237, "lv": 1}, {"x": 87, "y": 666, "lv": 1}, {"x": 267, "y": 1068, "lv": 1}, {"x": 636, "y": 1137, "lv": 1}, {"x": 1137, "y": 567, "lv": 1}, {"x": 1068, "y": 936, "lv": 1}
-    ]},
-    "production": { "name": "生産", "color": "#FF9800", "coords": [
-        {"x": 1068, "y": 237, "lv": 1}, {"x": 768, "y": 138, "lv": 1}, {"x": 237, "y": 138, "lv": 1}, {"x": 138, "y": 327, "lv": 1}, {"x": 138, "y": 957, "lv": 1}, {"x": 327, "y": 1038, "lv": 1}, {"x": 1068, "y": 747, "lv": 1}, {"x": 957, "y": 1068, "lv": 1}
-    ]},
-    "training": { "name": "訓練", "color": "#795548", "coords": [
-        {"x": 237, "y": 486, "lv": 2}, {"x": 138, "y": 747, "lv": 2}, {"x": 486, "y": 957, "lv": 2}, {"x": 768, "y": 1038, "lv": 2}, {"x": 957, "y": 747, "lv": 2}, {"x": 1068, "y": 486, "lv": 2}, {"x": 486, "y": 138, "lv": 2}, {"x": 768, "y": 237, "lv": 2}
-    ]},
-    "expedition": { "name": "遠征", "color": "#607D8B", "coords": [
-        {"x": 768, "y": 327, "lv": 3}, {"x": 327, "y": 567, "lv": 3}, {"x": 486, "y": 867, "lv": 3}, {"x": 867, "y": 666, "lv": 3}
-    ]}
+    "construction": { "name": "建築", "color": "#FF5252", "coords": [{"x": 1068, "y": 138, "lv": 1}, {"x": 537, "y": 138, "lv": 1}, {"x": 138, "y": 138, "lv": 1}, {"x": 138, "y": 666, "lv": 1}, {"x": 138, "y": 1038, "lv": 1}, {"x": 666, "y": 1068, "lv": 1}, {"x": 1068, "y": 567, "lv": 1}, {"x": 1068, "y": 1068, "lv": 1}, {"x": 486, "y": 327, "lv": 3}, {"x": 768, "y": 867, "lv": 3}, {"x": 867, "y": 567, "lv": 3}, {"x": 327, "y": 666, "lv": 3}]},
+    "defense": { "name": "防御", "color": "#448AFF", "coords": [{"x": 666, "y": 138, "lv": 2}, {"x": 438, "y": 267, "lv": 2}, {"x": 138, "y": 537, "lv": 2}, {"x": 237, "y": 768, "lv": 2}, {"x": 537, "y": 1038, "lv": 2}, {"x": 738, "y": 957, "lv": 2}, {"x": 1068, "y": 666, "lv": 2}, {"x": 957, "y": 438, "lv": 2}, {"x": 816, "y": 717, "lv": 4}, {"x": 387, "y": 717, "lv": 4}, {"x": 588, "y": 327, "lv": 4}]},
+    "tech": { "name": "技術", "color": "#FFEB3B", "coords": [{"x": 957, "y": 237, "lv": 1}, {"x": 666, "y": 267, "lv": 1}, {"x": 237, "y": 237, "lv": 1}, {"x": 267, "y": 537, "lv": 1}, {"x": 237, "y": 957, "lv": 1}, {"x": 537, "y": 936, "lv": 1}, {"x": 936, "y": 537, "lv": 1}, {"x": 957, "y": 957, "lv": 1}, {"x": 867, "y": 327, "lv": 3}, {"x": 327, "y": 327, "lv": 3}, {"x": 327, "y": 867, "lv": 3}, {"x": 867, "y": 867, "lv": 3}]},
+    "weapon": { "name": "武器", "color": "#E040FB", "coords": [{"x": 867, "y": 138, "lv": 2}, {"x": 366, "y": 138, "lv": 2}, {"x": 138, "y": 438, "lv": 2}, {"x": 138, "y": 867, "lv": 2}, {"x": 438, "y": 1068, "lv": 2}, {"x": 1068, "y": 327, "lv": 2}, {"x": 1068, "y": 867, "lv": 2}, {"x": 867, "y": 1068, "lv": 2}, {"x": 816, "y": 486, "lv": 4}, {"x": 387, "y": 486, "lv": 4}, {"x": 588, "y": 867, "lv": 4}]},
+    "gathering": { "name": "採取", "color": "#4CAF50", "coords": [{"x": 957, "y": 138, "lv": 1}, {"x": 537, "y": 87, "lv": 1}, {"x": 138, "y": 237, "lv": 1}, {"x": 87, "y": 666, "lv": 1}, {"x": 267, "y": 1068, "lv": 1}, {"x": 636, "y": 1137, "lv": 1}, {"x": 1137, "y": 567, "lv": 1}, {"x": 1068, "y": 936, "lv": 1}]},
+    "production": { "name": "生産", "color": "#FF9800", "coords": [{"x": 1068, "y": 237, "lv": 1}, {"x": 768, "y": 138, "lv": 1}, {"x": 237, "y": 138, "lv": 1}, {"x": 138, "y": 327, "lv": 1}, {"x": 138, "y": 957, "lv": 1}, {"x": 327, "y": 1038, "lv": 1}, {"x": 1068, "y": 747, "lv": 1}, {"x": 957, "y": 1068, "lv": 1}]},
+    "training": { "name": "訓練", "color": "#795548", "coords": [{"x": 237, "y": 486, "lv": 2}, {"x": 138, "y": 747, "lv": 2}, {"x": 486, "y": 957, "lv": 2}, {"x": 768, "y": 1038, "lv": 2}, {"x": 957, "y": 747, "lv": 2}, {"x": 1068, "y": 486, "lv": 2}, {"x": 486, "y": 138, "lv": 2}, {"x": 768, "y": 237, "lv": 2}]},
+    "expedition": { "name": "遠征", "color": "#607D8B", "coords": [{"x": 768, "y": 327, "lv": 3}, {"x": 327, "y": 567, "lv": 3}, {"x": 486, "y": 867, "lv": 3}, {"x": 867, "y": 666, "lv": 3}]}
 };
 
 let userState = { active: ["construction"], timers: {}, hidden: [] };
 const DUR = 72 * 60 * 60 * 1000;
-const STORAGE_KEY = 'wos_manager_data';
+const STORAGE_KEY = 'wos_manager_v150';
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
 function load() { const s = localStorage.getItem(STORAGE_KEY); if(s) userState = JSON.parse(s); }
 
-// エクスポート機能
 function exportData() {
     const blob = new Blob([JSON.stringify(userState, null, 2)], {type: 'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `wos_backup_${new Date().toISOString().substring(0,10)}.json`;
+    a.download = `wos_backup.json`;
     a.click();
 }
 
-// インポート機能
 function importData(e) {
     const reader = new FileReader();
     reader.onload = (event) => {
         try {
             userState = JSON.parse(event.target.result);
             save(); render();
-            alert("データを読み込みました");
-        } catch(err) { alert("無効なファイルです"); }
+        } catch(err) { alert("Invalid file"); }
     };
     reader.readAsText(e.target.files[0]);
 }
@@ -155,13 +132,10 @@ function render() {
                 const ed = new Date(t + DUR);
                 const endStr = `${ed.getMonth()+1}/${ed.getDate()} ${ed.getHours().toString().padStart(2,'0')}:${ed.getMinutes().toString().padStart(2,'0')}`;
                 content += `
-                    <div class="end-time">終了: ${endStr}</div>
+                    <div class="end-time">終了予定: ${endStr}</div>
                     <div class="countdown" id="t-${id}">--:--:--</div>
                     <div class="adjust-group">
-                        <button class="btn btn-adj" onclick="adj('${id}', 3600000)">+1h</button>
-                        <button class="btn btn-adj" onclick="adj('${id}', -3600000)">-1h</button>
-                        <button class="btn btn-adj" onclick="adj('${id}', 600000)">+10m</button>
-                        <button class="btn btn-adj" onclick="adj('${id}', -600000)">-10m</button>
+                        <button class="btn btn-sync" onclick="syncTimer('${id}')">残り時間を同期</button>
                         <button class="btn btn-reset" style="margin-left:auto" onclick="reset('${id}')">解除</button>
                     </div>
                 `;
@@ -175,12 +149,30 @@ function render() {
 }
 
 function start(id) { userState.timers[id] = Date.now(); save(); render(); }
-function reset(id) { if(confirm('タイマーを停止しますか？')) { delete userState.timers[id]; save(); render(); } }
+function reset(id) { if(confirm('解除しますか？')) { delete userState.timers[id]; save(); render(); } }
 function hideCard(id) { userState.hidden.push(id); save(); render(); }
-function resetHidden() { if(confirm('非表示にしたカードをすべて戻しますか？')) { userState.hidden = []; save(); render(); } }
+function resetHidden() { userState.hidden = []; save(); render(); }
 
-function adj(id, ms) {
-    if (userState.timers[id]) { userState.timers[id] += ms; save(); render(); }
+// 秒単位での残り時間同期機能
+function syncTimer(id) {
+    const input = prompt("ゲーム内の残り時間を入力してください\n例: 「5:23:10」や「5 23 10」など", "");
+    if (input === null) return;
+
+    // 数値以外の区切りをスペースに統一して分割
+    const parts = input.replace(/[:：\s]/g, ' ').trim().split(/\s+/);
+    let h = 0, m = 0, s = 0;
+
+    if (parts.length >= 1) h = parseInt(parts[0]) || 0;
+    if (parts.length >= 2) m = parseInt(parts[1]) || 0;
+    if (parts.length >= 3) s = parseInt(parts[2]) || 0;
+
+    const remainingMs = ((h * 3600) + (m * 60) + s) * 1000;
+    
+    // 現在時刻から逆算して、タイマーの開始時刻をセットする
+    // (開始時刻 + 72h) - 現在時刻 = 残り時間  =>  開始時刻 = 現在時刻 + 残り時間 - 72h
+    userState.timers[id] = Date.now() + remainingMs - DUR;
+    save();
+    render();
 }
 
 function tick() {
