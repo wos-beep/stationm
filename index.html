@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>工程ステーション管理 v1.5.1</title>
+    <title>工程ステーション管理 v1.6.0</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --brd: #333; }
         body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 20px; line-height: 1.4; }
         header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--brd); padding-bottom: 10px; margin-bottom: 20px; }
         .clock-box { background: #000; padding: 10px; border: 1px solid var(--accent); border-radius: 5px; font-family: monospace; font-size: 0.9rem; }
         .controls { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        .filter-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+        .filter-group { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
         .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; }
         .station-card { background: var(--card); border: 1px solid var(--brd); border-left: 6px solid #ccc; padding: 15px; border-radius: 6px; position: relative; }
         .end-time { font-size: 0.85rem; color: #bb86fc; margin-top: 5px; font-weight: bold; }
@@ -22,12 +22,13 @@
         .btn-io { background: #4527a0; font-size: 0.8rem; }
         .adjust-group { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
         .close-card { position: absolute; top: 10px; right: 10px; color: #888; cursor: pointer; font-size: 1.2rem; }
+        .filter-btn { font-size: 0.7rem; min-width: 80px; }
     </style>
 </head>
 <body>
 
 <header>
-    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.5.1 (互換性維持版)</small></h2>
+    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.6.0 (Lv別フィルタ & d表記対応)</small></h2>
     <div class="clock-box">
         <div>JST: <span id="jst">--:--:--</span></div>
         <div>UTC: <span id="utc">--:--:--</span></div>
@@ -37,11 +38,11 @@
 <div class="controls">
     <div style="display:flex; justify-content:space-between; align-items:center;">
         <div class="io-section">
-            <button class="btn btn-io" onclick="exportData()">データ保存(DL)</button>
-            <button class="btn btn-io" onclick="document.getElementById('import-file').click()">データ読込</button>
+            <button class="btn btn-io" onclick="exportData()">データ保存</button>
+            <button class="btn btn-io" onclick="document.getElementById('import-file').click()">読込</button>
             <input type="file" id="import-file" style="display:none" onchange="importData(event)">
         </div>
-        <button class="btn" style="font-size:0.75rem;" onclick="resetHidden()">非表示をすべて戻す</button>
+        <button class="btn" style="font-size:0.75rem;" onclick="resetHidden()">非表示解除</button>
     </div>
     <div id="filter-container" class="filter-group"></div>
 </div>
@@ -60,76 +61,39 @@ const MASTER_DATA = {
     "expedition": { "name": "遠征", "color": "#607D8B", "coords": [{"x": 768, "y": 327, "lv": 3}, {"x": 327, "y": 567, "lv": 3}, {"x": 486, "y": 867, "lv": 3}, {"x": 867, "y": 666, "lv": 3}]}
 };
 
-let userState = { active: ["construction"], timers: {}, hidden: [] };
+// フィルタ用のユニークな種類×Lvリストを作成
+const FILTER_LIST = [];
+Object.entries(MASTER_DATA).forEach(([typeKey, val]) => {
+    const lvs = [...new Set(val.coords.map(c => c.lv))].sort();
+    lvs.forEach(lv => FILTER_LIST.push({ key: `${typeKey}-${lv}`, type: typeKey, lv: lv, name: `${val.name} Lv.${lv}`, color: val.color }));
+});
+
+let userState = { active: ["construction-1", "construction-3"], timers: {}, hidden: [] };
 const DUR = 72 * 60 * 60 * 1000;
-// 今後はこのキーで固定します
 const STORAGE_KEY = 'wos_station_manager_data';
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
-
 function load() {
-    // 1. 最新の共通キーを確認
-    let s = localStorage.getItem(STORAGE_KEY);
-    
-    // 2. なければ古いバージョンのキーを探して救出する
-    if (!s) {
-        const legacyKeys = ['wos_manager_v150', 'wos_v130', 'wos_v120', 'wos_manager_data'];
-        for (const key of legacyKeys) {
-            const oldData = localStorage.getItem(key);
-            if (oldData) {
-                s = oldData;
-                console.log(`Migrated from ${key}`);
-                break;
-            }
-        }
-    }
-
+    const s = localStorage.getItem(STORAGE_KEY);
     if(s) {
-        try {
-            userState = JSON.parse(s);
-            // 読み込んだら最新の共通キーに保存しておく
-            save();
-        } catch(e) { console.error("Load failed", e); }
+        userState = JSON.parse(s);
+        // 旧バージョンの active (単なる種類名) を新しい形式に変換
+        userState.active = userState.active.map(act => act.includes('-') ? act : FILTER_LIST.find(f => f.type === act)?.key).filter(Boolean);
     }
-}
-
-function exportData() {
-    const blob = new Blob([JSON.stringify(userState, null, 2)], {type: 'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `wos_station_backup.json`;
-    a.click();
-}
-
-function importData(e) {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        try {
-            userState = JSON.parse(event.target.result);
-            save(); render();
-        } catch(err) { alert("Invalid file"); }
-    };
-    reader.readAsText(e.target.files[0]);
-}
-
-function updateClocks() {
-    const n = new Date();
-    document.getElementById('jst').innerText = n.toLocaleString('ja-JP');
-    document.getElementById('utc').innerText = n.toISOString().replace('T',' ').substring(0,19);
 }
 
 function render() {
     const f = document.getElementById('filter-container');
     f.innerHTML = '';
-    Object.keys(MASTER_DATA).forEach(k => {
+    FILTER_LIST.forEach(item => {
         const b = document.createElement('button');
-        const act = userState.active.includes(k);
-        b.className = `btn filter-btn ${act?'active':''}`;
-        b.style.backgroundColor = act ? MASTER_DATA[k].color : '#333';
+        const act = userState.active.includes(item.key);
+        b.className = `btn filter-btn`;
+        b.style.backgroundColor = act ? item.color : '#333';
         b.style.color = act ? '#000' : '#fff';
-        b.innerText = MASTER_DATA[k].name;
+        b.innerText = item.name;
         b.onclick = () => {
-            userState.active = act ? userState.active.filter(x=>x!==k) : [...userState.active, k];
+            userState.active = act ? userState.active.filter(x=>x!==item.key) : [...userState.active, item.key];
             save(); render();
         };
         f.appendChild(b);
@@ -137,33 +101,30 @@ function render() {
 
     const l = document.getElementById('station-list');
     l.innerHTML = '';
-    userState.active.forEach(k => {
-        MASTER_DATA[k].coords.forEach((c, i) => {
-            const id = `${k}-${i}`;
+    FILTER_LIST.forEach(item => {
+        if (!userState.active.includes(item.key)) return;
+        
+        MASTER_DATA[item.type].coords.filter(c => c.lv === item.lv).forEach((c, i) => {
+            const id = `${item.type}-${item.lv}-${i}`;
             if (userState.hidden.includes(id)) return;
 
             const card = document.createElement('div');
             card.className = 'station-card';
-            card.style.borderLeftColor = MASTER_DATA[k].color;
+            card.style.borderLeftColor = item.color;
             const t = userState.timers[id];
             
-            let content = `
-                <span class="close-card" onclick="hideCard('${id}')">&times;</span>
-                <div style="font-weight:bold">${MASTER_DATA[k].name} Lv.${c.lv}</div>
-                <div style="color:#888; font-size:0.75rem">座標: (${c.x}, ${c.y})</div>
-            `;
+            let content = `<span class="close-card" onclick="hideCard('${id}')">&times;</span>
+                           <div style="font-weight:bold">${item.name}</div>
+                           <div style="color:#888; font-size:0.75rem">座標: (${c.x}, ${c.y})</div>`;
 
             if (t) {
                 const ed = new Date(t + DUR);
-                const endStr = `${ed.getMonth()+1}/${ed.getDate()} ${ed.getHours().toString().padStart(2,'0')}:${ed.getMinutes().toString().padStart(2,'0')}`;
-                content += `
-                    <div class="end-time">終了予定: ${endStr}</div>
-                    <div class="countdown" id="t-${id}">--:--:--</div>
-                    <div class="adjust-group">
-                        <button class="btn btn-sync" onclick="syncTimer('${id}')">残り時間を同期</button>
-                        <button class="btn btn-reset" style="margin-left:auto" onclick="reset('${id}')">解除</button>
-                    </div>
-                `;
+                content += `<div class="end-time">終了予定: ${ed.getMonth()+1}/${ed.getDate()} ${ed.getHours().toString().padStart(2,'0')}:${ed.getMinutes().toString().padStart(2,'0')}</div>
+                            <div class="countdown" id="t-${id}">--:--:--</div>
+                            <div class="adjust-group">
+                                <button class="btn btn-sync" onclick="syncTimer('${id}')">残り同期</button>
+                                <button class="btn btn-reset" style="margin-left:auto" onclick="reset('${id}')">解除</button>
+                            </div>`;
             } else {
                 content += `<button class="btn btn-start" onclick="start('${id}')">保護開始 (72h)</button>`;
             }
@@ -173,24 +134,40 @@ function render() {
     });
 }
 
+function syncTimer(id) {
+    const input = prompt("ゲーム内の残り時間を入力\n例: 「1d 09:11:27」や「9:11」など", "");
+    if (input === null || input.trim() === "") return;
+
+    let totalSeconds = 0;
+    // 「d」が含まれる場合は日数を秒に換算
+    const dayMatch = input.match(/(\d+)d/i);
+    if (dayMatch) {
+        totalSeconds += parseInt(dayMatch[1]) * 86400;
+    }
+    
+    // d部分を除去して残りの数値を抽出
+    const timePart = input.replace(/\d+d/i, '').trim();
+    const parts = timePart.replace(/[:：\s]/g, ' ').trim().split(/\s+/);
+    
+    let h = 0, m = 0, s = 0;
+    if (parts.length === 3) { h = parseInt(parts[0]); m = parseInt(parts[1]); s = parseInt(parts[2]); }
+    else if (parts.length === 2) { h = parseInt(parts[0]); m = parseInt(parts[1]); }
+    else if (parts.length === 1 && parts[0] !== "") { h = parseInt(parts[0]); }
+
+    totalSeconds += (h * 3600) + (m * 60) + s;
+    userState.timers[id] = Date.now() + (totalSeconds * 1000) - DUR;
+    save(); render();
+}
+
 function start(id) { userState.timers[id] = Date.now(); save(); render(); }
 function reset(id) { if(confirm('解除しますか？')) { delete userState.timers[id]; save(); render(); } }
 function hideCard(id) { userState.hidden.push(id); save(); render(); }
 function resetHidden() { userState.hidden = []; save(); render(); }
-
-function syncTimer(id) {
-    const input = prompt("ゲーム内の残り時間を入力（例: 5:23:10）", "");
-    if (input === null) return;
-    const parts = input.replace(/[:：\s]/g, ' ').trim().split(/\s+/);
-    let h = 0, m = 0, s = 0;
-    if (parts.length >= 1) h = parseInt(parts[0]) || 0;
-    if (parts.length >= 2) m = parseInt(parts[1]) || 0;
-    if (parts.length >= 3) s = parseInt(parts[2]) || 0;
-    const remainingMs = ((h * 3600) + (m * 60) + s) * 1000;
-    userState.timers[id] = Date.now() + remainingMs - DUR;
-    save(); render();
+function updateClocks() {
+    const n = new Date();
+    document.getElementById('jst').innerText = n.toLocaleString('ja-JP');
+    document.getElementById('utc').innerText = n.toISOString().replace('T',' ').substring(0,19);
 }
-
 function tick() {
     updateClocks();
     Object.keys(userState.timers).forEach(id => {
@@ -203,6 +180,15 @@ function tick() {
             el.innerText = `${h}h ${m}m ${s}s`;
         }
     });
+}
+function exportData() {
+    const blob = new Blob([JSON.stringify(userState, null, 2)], {type: 'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `wos_station_backup.json`; a.click();
+}
+function importData(e) {
+    const reader = new FileReader();
+    reader.onload = (event) => { try { userState = JSON.parse(event.target.result); save(); render(); } catch(err) { alert("Invalid file"); } };
+    reader.readAsText(e.target.files[0]);
 }
 
 window.onload = () => { load(); render(); setInterval(tick, 1000); };
