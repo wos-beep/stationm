@@ -2,49 +2,59 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>工程管理 v1.9.4</title>
+    <title>工程ステーション管理 v2.0.0</title>
     <style>
-        :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --enemy: #ff5252; --none: #555; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 15px; padding-bottom: 240px; font-size: 14px; }
-        .controls { background: #222; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; }
-        .btn { cursor: pointer; padding: 6px 10px; border: none; border-radius: 4px; background: #444; color: white; font-weight: bold; font-size: 0.75rem; }
-        .btn-main { background: #4527a0; }
-        .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-        .station-card { background: var(--card); border-left: 6px solid var(--none); padding: 12px; border-radius: 6px; position: relative; opacity: 0.6; transition: 0.3s; }
-        .station-card.active-node { opacity: 1; border-top: 1px solid #333; }
+        :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --enemy: #ff5252; --own: #448AFF; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 15px; padding-bottom: 240px; }
+        .controls { background: #222; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; position: sticky; top: 10px; z-index: 100; }
+        .btn { cursor: pointer; padding: 8px 12px; border: none; border-radius: 4px; background: #444; color: white; font-weight: bold; }
+        .btn-add { background: #2e7d32; }
+        .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+        .station-card { background: var(--card); border-left: 6px solid #555; padding: 12px; border-radius: 6px; position: relative; border-top: 1px solid #333; }
+        .station-card.own { border-color: var(--own); }
         .station-card.enemy { border-color: var(--enemy); background: linear-gradient(145deg, #1e1e1e, #300); }
-        .station-card.own { border-color: #448AFF; }
-        .countdown { font-size: 1.7rem; font-weight: bold; color: #ff5252; font-family: monospace; margin: 8px 0; }
+        .countdown { font-size: 1.8rem; font-weight: bold; color: #ff5252; font-family: monospace; margin: 8px 0; }
+        
+        /* 追加用モーダル */
+        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; overflow-y: auto; }
+        .modal-content { background: #222; margin: 5% auto; padding: 20px; width: 90%; max-width: 600px; border-radius: 8px; }
+        .modal-item { padding: 10px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
         .summary-panel { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; border-top: 3px solid var(--accent); padding: 12px; z-index: 1000; }
-        .summary-item { background: #2a2a2a; padding: 4px 8px; border-radius: 4px; display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 3px; }
-        .mode-selector { display: flex; gap: 4px; margin-bottom: 8px; }
-        .mode-btn { font-size: 0.65rem; padding: 2px 6px; border: 1px solid #444; background: #222; color: #888; cursor: pointer; border-radius: 3px; }
-        .mode-btn.selected { background: #444; color: #fff; border-color: #888; }
     </style>
 </head>
 <body>
 
 <div class="controls">
-    <div style="display:flex; gap:8px; margin-bottom:10px;">
-        <button class="btn btn-main" onclick="exportData()">保存(JSON)</button>
-        <button class="btn btn-main" onclick="document.getElementById('import-file').click()">読込</button>
-        <button class="btn" style="background:#00897b" onclick="shareURL()">復旧URL発行</button>
+    <div style="display:flex; gap:10px;">
+        <button class="btn btn-add" onclick="showModal()">＋ 管理するステーションを追加</button>
+        <button class="btn" style="background:#4527a0" onclick="exportData()">バックアップ保存</button>
+        <button class="btn" onclick="document.getElementById('import-file').click()">読込</button>
         <input type="file" id="import-file" style="display:none" onchange="importData(event)">
     </div>
-    <div id="filter-container" style="display:flex; gap:5px; flex-wrap:wrap;"></div>
 </div>
 
-<div class="station-grid" id="station-list"></div>
+<div id="station-list" class="station-grid"></div>
+
+<div id="modal">
+    <div class="modal-content">
+        <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+            <h3>ステーションを選択</h3>
+            <button class="btn" onclick="hideModal()">閉じる</button>
+        </div>
+        <div id="modal-list"></div>
+    </div>
+</div>
 
 <div class="summary-panel">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <strong style="color:var(--accent); font-size:0.9rem;">⏳ 保護終了/争奪 順 (稼働中のみ)</strong>
-        <button class="btn" style="background:#1565c0; font-size:0.7rem;" onclick="copySummaryText()">サマリーコピー</button>
+        <strong style="color:var(--accent)">⏳ 終了間近サマリー</strong>
+        <button class="btn" style="background:#1565c0; font-size:0.7rem;" onclick="copySummaryText()">テキストコピー</button>
     </div>
-    <div id="summary-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:5px; max-height:160px; overflow-y:auto;"></div>
+    <div id="summary-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:5px; max-height:150px; overflow-y:auto;"></div>
 </div>
 
 <script>
+// 全座標データ（ここから選択する）
 const MASTER_DATA = {
     "construction": { "name": "建築", "color": "#FF5252", "coords": [{"x": 1068, "y": 138, "lv": 1}, {"x": 486, "y": 327, "lv": 3}] },
     "defense": { "name": "防御", "color": "#448AFF", "coords": [{"x": 666, "y": 138, "lv": 2}, {"x": 816, "y": 717, "lv": 4}] },
@@ -57,61 +67,97 @@ const MASTER_DATA = {
     "refining": { "name": "精錬", "color": "#00BCD4", "coords": [{"x": 666, "y": 588, "lv": 4}, {"x": 462, "y": 588, "lv": 5}] }
 };
 
-const FILTER_LIST = [];
-Object.entries(MASTER_DATA).forEach(([k, v]) => {
-    v.coords.forEach((c, i) => FILTER_LIST.push({ key: `${k}-${v.name}-${c.lv}-${i}`, type: k, lv: c.lv, name: `${v.name} Lv.${c.lv}`, x: c.x, y: c.y }));
-});
-
-let userState = { timers: {}, modes: {} }; // modes: {id: 'none'|'own'|'enemy'}
-const STORAGE_KEY = 'wos_station_manager_v194';
+let userState = { selectedIds: [], timers: {}, modes: {} };
+const STORAGE_KEY = 'wos_station_v200';
 const DUR = 72 * 60 * 60 * 1000;
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
 function load() {
-    const params = new URLSearchParams(window.location.search);
-    const d = params.get('d');
-    if (d) {
-        try { userState = JSON.parse(decodeURIComponent(atob(d))); save(); window.history.replaceState({}, '', location.pathname); } catch(e){}
-    } else {
-        const s = localStorage.getItem(STORAGE_KEY);
-        if(s) userState = JSON.parse(s);
+    const s = localStorage.getItem(STORAGE_KEY);
+    if(s) userState = JSON.parse(s);
+    render();
+}
+
+function showModal() {
+    const modal = document.getElementById('modal');
+    const list = document.getElementById('modal-list');
+    modal.style.display = 'block';
+    list.innerHTML = '';
+    
+    Object.entries(MASTER_DATA).forEach(([key, category]) => {
+        category.coords.forEach((c, i) => {
+            const id = `${key}-${c.lv}-${i}`;
+            if (userState.selectedIds.includes(id)) return;
+            const div = document.createElement('div');
+            div.className = 'modal-item';
+            div.innerHTML = `
+                <span>${category.name} Lv.${c.lv} (${c.x}, ${c.y})</span>
+                <button class="btn btn-add" onclick="addStation('${id}')">追加</button>
+            `;
+            list.appendChild(div);
+        });
+    });
+}
+
+function hideModal() { document.getElementById('modal').style.display = 'none'; }
+
+function addStation(id) {
+    userState.selectedIds.push(id);
+    userState.modes[id] = 'none';
+    save();
+    render();
+    hideModal();
+}
+
+function removeStation(id) {
+    if(confirm('管理リストから削除しますか？')) {
+        userState.selectedIds = userState.selectedIds.filter(x => x !== id);
+        delete userState.timers[id];
+        delete userState.modes[id];
+        save();
+        render();
     }
 }
 
 function render() {
-    const list = document.getElementById('station-list');
-    list.innerHTML = '';
-    FILTER_LIST.forEach(item => {
-        const id = item.key;
+    const grid = document.getElementById('station-list');
+    grid.innerHTML = '';
+    
+    userState.selectedIds.forEach(id => {
+        const [key, lv, idx] = id.split('-');
+        const item = MASTER_DATA[key].coords[idx];
         const mode = userState.modes[id] || 'none';
         const t = userState.timers[id];
         const card = document.createElement('div');
-        card.className = `station-card ${mode!=='none'?'active-node':''} ${mode==='enemy'?'enemy':''} ${mode==='own'?'own':''}`;
+        card.className = `station-card ${mode==='own'?'own':''} ${mode==='enemy'?'enemy':''}`;
         
         card.innerHTML = `
-            <div class="mode-selector">
-                <button class="mode-btn ${mode==='none'?'selected':''}" onclick="setMode('${id}','none')">管理外</button>
-                <button class="mode-btn ${mode==='own'?'selected':''}" onclick="setMode('${id}','own')">自同盟</button>
-                <button class="mode-btn ${mode==='enemy'?'selected':''}" onclick="setMode('${id}','enemy')">敵同盟</button>
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                <div style="display:flex; gap:4px;">
+                    <button class="btn" style="font-size:0.6rem; padding:2px 5px; background:${mode==='own'?'#448AFF':'#333'}" onclick="setMode('${id}','own')">自</button>
+                    <button class="btn" style="font-size:0.6rem; padding:2px 5px; background:${mode==='enemy'?'#ff5252':'#333'}" onclick="setMode('${id}','enemy')">敵</button>
+                    <button class="btn" style="font-size:0.6rem; padding:2px 5px; background:${mode==='none'?'#888':'#333'}" onclick="setMode('${id}','none')">無</button>
+                </div>
+                <span style="cursor:pointer; color:#888;" onclick="removeStation('${id}')">&times;</span>
             </div>
-            <div style="font-weight:bold;">${item.name} <small style="color:#aaa;">(${item.x}, ${item.y})</small></div>
+            <div style="font-weight:bold;">${MASTER_DATA[key].name} Lv.${lv} <small>(${item.x}, ${item.y})</small></div>
             ${t ? `<div class="countdown" id="t-${id}">--:--:--</div>
                    <div style="display:flex; gap:5px;">
                        <button class="btn" style="background:#0277bd; flex:1" onclick="sync('${id}')">同期</button>
-                       <button class="btn" style="background:#c62828" onclick="reset('${id}')">解除</button>
+                       <button class="btn" style="background:#c62828" onclick="resetTimer('${id}')">リセット</button>
                    </div>` 
-                : `<button class="btn" style="background:#2e7d32; width:100%; margin-top:8px; display:${mode==='none'?'none':'block'}" onclick="start('${id}')">今から72h保護開始</button>`}
+                : `<button class="btn" style="background:#2e7d32; width:100%; margin-top:10px;" onclick="startTimer('${id}')">保護開始</button>`}
         `;
-        list.appendChild(card);
+        grid.appendChild(card);
     });
 }
 
-function setMode(id, m) { userState.modes[id] = m; if(m==='none') delete userState.timers[id]; save(); render(); }
-function start(id) { userState.timers[id] = Date.now(); save(); render(); }
-function reset(id) { if(confirm('タイマーを解除しますか？')) { delete userState.timers[id]; save(); render(); } }
+function setMode(id, m) { userState.modes[id] = m; save(); render(); }
+function startTimer(id) { userState.timers[id] = Date.now(); save(); render(); }
+function resetTimer(id) { delete userState.timers[id]; save(); render(); }
 
 function sync(id) {
-    const val = prompt("残り時間を入力 (例: 1d 09:11:27)", "");
+    const val = prompt("残り時間 (例: 1d 09:11:27)", "");
     if (!val) return;
     let s = 0;
     const d = val.match(/(\d+)d/i); if(d) s += d[1] * 86400;
@@ -125,9 +171,10 @@ function sync(id) {
 
 function tick() {
     const now = Date.now();
-    const summaryList = [];
-    Object.keys(userState.timers).forEach(id => {
+    const summaryItems = [];
+    userState.selectedIds.forEach(id => {
         const el = document.getElementById(`t-${id}`);
+        if(!userState.timers[id]) return;
         const diff = (userState.timers[id] + DUR) - now;
         if(el) {
             if(diff <= 0) { el.innerText = "終了"; el.style.color = "#888"; }
@@ -136,53 +183,42 @@ function tick() {
                 el.innerText = `${h}h ${m}m ${s}s`;
             }
         }
-        const item = FILTER_LIST.find(f => f.key === id);
-        if(item) summaryList.push({ name: item.name, diff, mode: userState.modes[id] });
+        const [key, lv, idx] = id.split('-');
+        summaryItems.push({ name: `${MASTER_DATA[key].name} Lv.${lv}`, diff, mode: userState.modes[id] });
     });
-
-    const sCont = document.getElementById('summary-list');
-    summaryList.sort((a,b) => a.diff - b.diff);
-    sCont.innerHTML = summaryList.map(t => `
-        <div class="summary-item ${t.diff < 3600000 ? 'warn' : ''}">
-            <span>${t.mode==='enemy'?'●敵':'○自'} ${t.name}</span>
-            <span style="font-family:monospace; font-weight:bold;">${Math.floor(Math.max(0,t.diff)/3600000)}h ${Math.floor((Math.max(0,t.diff)%3600000)/60000)}m</span>
+    
+    const sList = document.getElementById('summary-list');
+    summaryItems.sort((a,b) => a.diff - b.diff);
+    sList.innerHTML = summaryItems.map(i => `
+        <div class="summary-item" style="background:#2a2a2a; padding:4px 8px; border-radius:4px; display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:3px; border-left:3px solid ${i.mode==='enemy'?'#ff5252':'#448AFF'}">
+            <span>${i.mode==='enemy'?'●敵':'○自'} ${i.name}</span>
+            <span style="font-family:monospace;">${Math.floor(Math.max(0,i.diff)/3600000)}h ${Math.floor((Math.max(0,i.diff)%3600000)/60000)}m</span>
         </div>
     `).join('');
 }
 
 function copySummaryText() {
     let txt = "【ステーション保護状況】\n";
-    const items = Object.keys(userState.timers).map(id => {
+    const items = userState.selectedIds.filter(id => userState.timers[id]).map(id => {
         const t = userState.timers[id] + DUR;
-        const ed = new Date(t);
-        const item = FILTER_LIST.find(f => f.key === id);
-        return { name: item.name, diff: t - Date.now(), mode: userState.modes[id], time: `${ed.getMonth()+1}/${ed.getDate()} ${ed.getHours()}:${ed.getMinutes().toString().padStart(2,'0')}` };
+        const [key, lv, idx] = id.split('-');
+        return { name: `${MASTER_DATA[key].name} Lv.${lv}`, diff: t - Date.now(), mode: userState.modes[id], end: new Date(t).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) };
     }).sort((a,b) => a.diff - b.diff);
-
-    items.forEach(i => {
-        txt += `${i.mode==='enemy'?'●敵':'○自'} ${i.name}: 残 ${Math.floor(Math.max(0,i.diff)/3600000)}h ${Math.floor((Math.max(0,i.diff)%3600000)/60000)}m (${i.time}終了)\n`;
-    });
-    navigator.clipboard.writeText(txt).then(() => alert("コピー完了"));
-}
-
-function shareURL() {
-    const b64 = btoa(encodeURIComponent(JSON.stringify(userState)));
-    const url = window.location.origin + window.location.pathname + "?d=" + b64;
-    navigator.clipboard.writeText(url).then(() => alert("復旧用URLをコピーしました。これをブックマークすれば、データが消えても100%戻せます。"));
+    items.forEach(i => txt += `${i.mode==='enemy'?'●敵':'○自'} ${i.name}: 残 ${Math.floor(Math.max(0,i.diff)/3600000)}h ${Math.floor((Math.max(0,i.diff)%3600000)/60000)}m (${i.end})\n`);
+    navigator.clipboard.writeText(txt).then(() => alert("コピーしました"));
 }
 
 function exportData() {
     const blob = new Blob([JSON.stringify(userState)], {type:'application/json'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `wos_backup.json`; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `wos_v2_backup.json`; a.click();
 }
-
 function importData(e) {
     const reader = new FileReader();
     reader.onload = (ev) => { try { userState = JSON.parse(ev.target.result); save(); render(); } catch(err){alert("失敗");} };
     reader.readAsText(e.target.files[0]);
 }
 
-window.onload = () => { load(); render(); setInterval(tick, 1000); };
+window.onload = () => { load(); setInterval(tick, 1000); };
 </script>
 </body>
 </html>
