@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>工程ステーション管理 v1.3.0</title>
+    <title>工程ステーション管理 v1.4.0</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --brd: #333; }
         body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 20px; line-height: 1.4; }
         header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--brd); padding-bottom: 10px; margin-bottom: 20px; }
         .clock-box { background: #000; padding: 10px; border: 1px solid var(--accent); border-radius: 5px; font-family: monospace; font-size: 0.9rem; }
         .controls { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        .filter-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .filter-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
         .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
         .station-card { background: var(--card); border: 1px solid var(--brd); border-left: 6px solid #ccc; padding: 15px; border-radius: 6px; position: relative; }
         .end-time { font-size: 0.85rem; color: #bb86fc; margin-top: 5px; font-weight: bold; }
@@ -18,15 +18,17 @@
         .btn { cursor: pointer; padding: 6px 10px; border: none; border-radius: 4px; background: #444; color: white; font-size: 0.85rem; }
         .btn-start { background: #2e7d32; width: 100%; font-weight: bold; margin-top: 10px; height: 40px; }
         .btn-reset { background: #c62828; font-size: 0.75rem; }
+        .btn-io { background: #4527a0; font-size: 0.8rem; }
         .adjust-group { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
         .btn-adj { background: #1565c0; font-size: 0.7rem; padding: 3px 6px; }
         .close-card { position: absolute; top: 10px; right: 10px; color: #888; cursor: pointer; font-size: 1.2rem; }
+        .io-section { margin-top: 20px; padding-top: 10px; border-top: 1px solid #444; display: flex; gap: 10px; }
     </style>
 </head>
 <body>
 
 <header>
-    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.3.0 手動同期対応</small></h2>
+    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.4.0 (IO機能復旧)</small></h2>
     <div class="clock-box">
         <div>JST: <span id="jst">--:--:--</span></div>
         <div>UTC: <span id="utc">--:--:--</span></div>
@@ -34,9 +36,13 @@
 </header>
 
 <div class="controls">
-    <div style="margin-bottom:10px; font-size:0.85rem; display:flex; justify-content:space-between;">
-        <span>表示切替:</span>
-        <button class="btn" style="font-size:0.75rem;" onclick="resetHidden()">非表示を戻す</button>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="io-section" style="margin:0; border:none; padding:0;">
+            <button class="btn btn-io" onclick="exportData()">データ保存(DL)</button>
+            <button class="btn btn-io" onclick="document.getElementById('import-file').click()">データ読込</button>
+            <input type="file" id="import-file" style="display:none" onchange="importData(event)">
+        </div>
+        <button class="btn" style="font-size:0.75rem;" onclick="resetHidden()">非表示をすべて戻す</button>
     </div>
     <div id="filter-container" class="filter-group"></div>
 </div>
@@ -44,7 +50,6 @@
 <div class="station-grid" id="station-list"></div>
 
 <script>
-// 画像に基づいた最新座標データ
 const MASTER_DATA = {
     "construction": { "name": "建築", "color": "#FF5252", "coords": [
         {"x": 1068, "y": 138, "lv": 1}, {"x": 537, "y": 138, "lv": 1}, {"x": 138, "y": 138, "lv": 1}, {"x": 138, "y": 666, "lv": 1}, {"x": 138, "y": 1038, "lv": 1}, {"x": 666, "y": 1068, "lv": 1}, {"x": 1068, "y": 567, "lv": 1}, {"x": 1068, "y": 1068, "lv": 1},
@@ -78,9 +83,32 @@ const MASTER_DATA = {
 
 let userState = { active: ["construction"], timers: {}, hidden: [] };
 const DUR = 72 * 60 * 60 * 1000;
+const STORAGE_KEY = 'wos_manager_data';
 
-function save() { localStorage.setItem('wos_v130', JSON.stringify(userState)); }
-function load() { const s = localStorage.getItem('wos_v130'); if(s) userState = JSON.parse(s); }
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
+function load() { const s = localStorage.getItem(STORAGE_KEY); if(s) userState = JSON.parse(s); }
+
+// エクスポート機能
+function exportData() {
+    const blob = new Blob([JSON.stringify(userState, null, 2)], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `wos_backup_${new Date().toISOString().substring(0,10)}.json`;
+    a.click();
+}
+
+// インポート機能
+function importData(e) {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            userState = JSON.parse(event.target.result);
+            save(); render();
+            alert("データを読み込みました");
+        } catch(err) { alert("無効なファイルです"); }
+    };
+    reader.readAsText(e.target.files[0]);
+}
 
 function updateClocks() {
     const n = new Date();
@@ -134,7 +162,6 @@ function render() {
                         <button class="btn btn-adj" onclick="adj('${id}', -3600000)">-1h</button>
                         <button class="btn btn-adj" onclick="adj('${id}', 600000)">+10m</button>
                         <button class="btn btn-adj" onclick="adj('${id}', -600000)">-10m</button>
-                        <button class="btn btn-adj" onclick="adj('${id}', 60000)">+1m</button>
                         <button class="btn btn-reset" style="margin-left:auto" onclick="reset('${id}')">解除</button>
                     </div>
                 `;
@@ -150,15 +177,10 @@ function render() {
 function start(id) { userState.timers[id] = Date.now(); save(); render(); }
 function reset(id) { if(confirm('タイマーを停止しますか？')) { delete userState.timers[id]; save(); render(); } }
 function hideCard(id) { userState.hidden.push(id); save(); render(); }
-function resetHidden() { userState.hidden = []; save(); render(); }
+function resetHidden() { if(confirm('非表示にしたカードをすべて戻しますか？')) { userState.hidden = []; save(); render(); } }
 
-// 時間の微調整 (ms: ミリ秒)
 function adj(id, ms) {
-    if (userState.timers[id]) {
-        userState.timers[id] += ms;
-        save();
-        render();
-    }
+    if (userState.timers[id]) { userState.timers[id] += ms; save(); render(); }
 }
 
 function tick() {
