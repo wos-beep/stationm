@@ -3,14 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>工程ステーション管理 v1.6.0</title>
+    <title>工程ステーション管理 v1.7.0</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --brd: #333; }
         body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 20px; line-height: 1.4; }
         header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--brd); padding-bottom: 10px; margin-bottom: 20px; }
         .clock-box { background: #000; padding: 10px; border: 1px solid var(--accent); border-radius: 5px; font-family: monospace; font-size: 0.9rem; }
         .controls { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        .filter-group { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+        .filter-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+        
+        /* フィルタボタンと個別リセットのセット */
+        .filter-item { display: flex; align-items: center; background: #333; border-radius: 4px; overflow: hidden; }
+        .filter-btn { cursor: pointer; padding: 6px 10px; border: none; color: white; font-size: 0.75rem; min-width: 80px; transition: opacity 0.2s; }
+        .filter-btn.active { color: #000; font-weight: bold; }
+        .filter-reset { cursor: pointer; background: rgba(255,255,255,0.1); border: none; color: #aaa; padding: 6px 6px; font-size: 0.7rem; border-left: 1px solid rgba(0,0,0,0.2); }
+        .filter-reset:hover { background: rgba(255,255,255,0.2); color: #fff; }
+
         .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; }
         .station-card { background: var(--card); border: 1px solid var(--brd); border-left: 6px solid #ccc; padding: 15px; border-radius: 6px; position: relative; }
         .end-time { font-size: 0.85rem; color: #bb86fc; margin-top: 5px; font-weight: bold; }
@@ -22,13 +30,12 @@
         .btn-io { background: #4527a0; font-size: 0.8rem; }
         .adjust-group { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
         .close-card { position: absolute; top: 10px; right: 10px; color: #888; cursor: pointer; font-size: 1.2rem; }
-        .filter-btn { font-size: 0.7rem; min-width: 80px; }
     </style>
 </head>
 <body>
 
 <header>
-    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.6.0 (Lv別フィルタ & d表記対応)</small></h2>
+    <h2>工程管理 <small style="font-size:0.5em; color:#888;">v1.7.0 (個別非表示解除)</small></h2>
     <div class="clock-box">
         <div>JST: <span id="jst">--:--:--</span></div>
         <div>UTC: <span id="utc">--:--:--</span></div>
@@ -42,7 +49,7 @@
             <button class="btn btn-io" onclick="document.getElementById('import-file').click()">読込</button>
             <input type="file" id="import-file" style="display:none" onchange="importData(event)">
         </div>
-        <button class="btn" style="font-size:0.75rem;" onclick="resetHidden()">非表示解除</button>
+        <button class="btn" style="font-size:0.75rem;" onclick="resetHiddenAll()">すべての非表示を戻す</button>
     </div>
     <div id="filter-container" class="filter-group"></div>
 </div>
@@ -61,49 +68,62 @@ const MASTER_DATA = {
     "expedition": { "name": "遠征", "color": "#607D8B", "coords": [{"x": 768, "y": 327, "lv": 3}, {"x": 327, "y": 567, "lv": 3}, {"x": 486, "y": 867, "lv": 3}, {"x": 867, "y": 666, "lv": 3}]}
 };
 
-// フィルタ用のユニークな種類×Lvリストを作成
 const FILTER_LIST = [];
 Object.entries(MASTER_DATA).forEach(([typeKey, val]) => {
     const lvs = [...new Set(val.coords.map(c => c.lv))].sort();
     lvs.forEach(lv => FILTER_LIST.push({ key: `${typeKey}-${lv}`, type: typeKey, lv: lv, name: `${val.name} Lv.${lv}`, color: val.color }));
 });
 
-let userState = { active: ["construction-1", "construction-3"], timers: {}, hidden: [] };
+let userState = { active: ["construction-1"], timers: {}, hidden: [] };
 const DUR = 72 * 60 * 60 * 1000;
 const STORAGE_KEY = 'wos_station_manager_data';
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
 function load() {
     const s = localStorage.getItem(STORAGE_KEY);
-    if(s) {
-        userState = JSON.parse(s);
-        // 旧バージョンの active (単なる種類名) を新しい形式に変換
-        userState.active = userState.active.map(act => act.includes('-') ? act : FILTER_LIST.find(f => f.type === act)?.key).filter(Boolean);
-    }
+    if(s) userState = JSON.parse(s);
 }
 
 function render() {
     const f = document.getElementById('filter-container');
     f.innerHTML = '';
     FILTER_LIST.forEach(item => {
-        const b = document.createElement('button');
+        const wrap = document.createElement('div');
+        wrap.className = 'filter-item';
+
+        const btn = document.createElement('button');
         const act = userState.active.includes(item.key);
-        b.className = `btn filter-btn`;
-        b.style.backgroundColor = act ? item.color : '#333';
-        b.style.color = act ? '#000' : '#fff';
-        b.innerText = item.name;
-        b.onclick = () => {
+        btn.className = `filter-btn ${act?'active':''}`;
+        btn.style.backgroundColor = act ? item.color : '#333';
+        btn.innerText = item.name;
+        btn.onclick = () => {
             userState.active = act ? userState.active.filter(x=>x!==item.key) : [...userState.active, item.key];
             save(); render();
         };
-        f.appendChild(b);
+
+        const res = document.createElement('button');
+        res.className = 'filter-reset';
+        res.innerHTML = '↺';
+        res.title = `${item.name}の非表示をすべて戻す`;
+        res.onclick = (e) => {
+            e.stopPropagation();
+            if(confirm(`${item.name} の非表示を解除しますか？`)) {
+                // そのタイプとLvに合致するIDのみ削除
+                const prefix = `${item.type}-${item.lv}-`;
+                userState.hidden = userState.hidden.filter(id => !id.startsWith(prefix));
+                save(); render();
+            }
+        };
+
+        wrap.appendChild(btn);
+        wrap.appendChild(res);
+        f.appendChild(wrap);
     });
 
     const l = document.getElementById('station-list');
     l.innerHTML = '';
     FILTER_LIST.forEach(item => {
         if (!userState.active.includes(item.key)) return;
-        
         MASTER_DATA[item.type].coords.filter(c => c.lv === item.lv).forEach((c, i) => {
             const id = `${item.type}-${item.lv}-${i}`;
             if (userState.hidden.includes(id)) return;
@@ -135,25 +155,17 @@ function render() {
 }
 
 function syncTimer(id) {
-    const input = prompt("ゲーム内の残り時間を入力\n例: 「1d 09:11:27」や「9:11」など", "");
-    if (input === null || input.trim() === "") return;
-
+    const input = prompt("残り時間を入力 (例: 1d 09:11:27)", "");
+    if (!input) return;
     let totalSeconds = 0;
-    // 「d」が含まれる場合は日数を秒に換算
     const dayMatch = input.match(/(\d+)d/i);
-    if (dayMatch) {
-        totalSeconds += parseInt(dayMatch[1]) * 86400;
-    }
-    
-    // d部分を除去して残りの数値を抽出
+    if (dayMatch) totalSeconds += parseInt(dayMatch[1]) * 86400;
     const timePart = input.replace(/\d+d/i, '').trim();
     const parts = timePart.replace(/[:：\s]/g, ' ').trim().split(/\s+/);
-    
-    let h = 0, m = 0, s = 0;
-    if (parts.length === 3) { h = parseInt(parts[0]); m = parseInt(parts[1]); s = parseInt(parts[2]); }
-    else if (parts.length === 2) { h = parseInt(parts[0]); m = parseInt(parts[1]); }
-    else if (parts.length === 1 && parts[0] !== "") { h = parseInt(parts[0]); }
-
+    let h=0, m=0, s=0;
+    if (parts.length === 3) { h=parseInt(parts[0]); m=parseInt(parts[1]); s=parseInt(parts[2]); }
+    else if (parts.length === 2) { h=parseInt(parts[0]); m=parseInt(parts[1]); }
+    else if (parts.length === 1 && parts[0]!=="") { h=parseInt(parts[0]); }
     totalSeconds += (h * 3600) + (m * 60) + s;
     userState.timers[id] = Date.now() + (totalSeconds * 1000) - DUR;
     save(); render();
@@ -162,14 +174,12 @@ function syncTimer(id) {
 function start(id) { userState.timers[id] = Date.now(); save(); render(); }
 function reset(id) { if(confirm('解除しますか？')) { delete userState.timers[id]; save(); render(); } }
 function hideCard(id) { userState.hidden.push(id); save(); render(); }
-function resetHidden() { userState.hidden = []; save(); render(); }
-function updateClocks() {
+function resetHiddenAll() { if(confirm('すべての非表示を解除しますか？')) { userState.hidden = []; save(); render(); } }
+
+function tick() {
     const n = new Date();
     document.getElementById('jst').innerText = n.toLocaleString('ja-JP');
     document.getElementById('utc').innerText = n.toISOString().replace('T',' ').substring(0,19);
-}
-function tick() {
-    updateClocks();
     Object.keys(userState.timers).forEach(id => {
         const el = document.getElementById(`t-${id}`);
         if(!el) return;
@@ -181,6 +191,7 @@ function tick() {
         }
     });
 }
+
 function exportData() {
     const blob = new Blob([JSON.stringify(userState, null, 2)], {type: 'application/json'});
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `wos_station_backup.json`; a.click();
