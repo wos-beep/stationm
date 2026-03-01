@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工程ステーション管理 v1.0.0</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #bb86fc;
+            --border-color: #333;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .clock-container {
+            text-align: right;
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .station-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .station-card {
+            background: var(--card-bg);
+            border-left: 5px solid #ccc;
+            padding: 15px;
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .station-card.hidden { display: none; }
+
+        .time-info {
+            font-size: 0.9rem;
+            margin: 10px 0;
+            background: rgba(0,0,0,0.3);
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .countdown {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ff5252;
+        }
+
+        .btn {
+            cursor: pointer;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            background: #333;
+            color: white;
+            transition: 0.2s;
+        }
+
+        .btn:hover { background: #444; }
+        .btn-start { background: #4caf50; }
+        .btn-reset { background: #f44336; }
+        .btn-adjust { background: #2196f3; font-size: 0.8rem; }
+
+        .filter-btn {
+            opacity: 0.5;
+        }
+        .filter-btn.active {
+            opacity: 1;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        #import-export {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1>工程ステーション管理 <small style="font-size: 0.5em;">v1.0.0</small></h1>
+    </div>
+    <div class="clock-container">
+        <div>JST: <span id="jst-clock">--:--:--</span></div>
+        <div>UTC: <span id="utc-clock">--:--:--</span></div>
+    </div>
+</header>
+
+<div class="controls" id="filter-container">
+    </div>
+
+<div class="station-grid" id="station-list">
+    </div>
+
+<div id="import-export">
+    <button class="btn" onclick="exportData()">データをエクスポート (JSON)</button>
+    <button class="btn" onclick="document.getElementById('import-file').click()">データをインポート</button>
+    <input type="file" id="import-file" style="display:none" onchange="importData(event)">
+</div>
+
+<script>
+const STORAGE_VERSION = "1.0.0";
+const PROTECT_DURATION = 72 * 60 * 60 * 1000; // 72時間
+
+// ステーション定義（提供されたJSONをベースに構築）
+const stationData = {
+    "construction": { "name": "建築ステーション", "color": "#FF5252", "coords": [ {"x": 1068, "y": 138, "lv": 1}, {"x": 537, "y": 138, "lv": 1}, {"x": 138, "y": 138, "lv": 1}, {"x": 138, "y": 666, "lv": 1}, {"x": 138, "y": 1038, "lv": 1}, {"x": 666, "y": 1068, "lv": 1}, {"x": 1068, "y": 567, "lv": 1}, {"x": 1068, "y": 1068, "lv": 1}, {"x": 486, "y": 327, "lv": 3}, {"x": 768, "y": 867, "lv": 3}, {"x": 867, "y": 567, "lv": 3}, {"x": 327, "y": 666, "lv": 3} ] },
+    "defense": { "name": "防御ステーション", "color": "#448AFF", "coords": [ {"x": 666, "y": 138, "lv": 2}, {"x": 438, "y": 267, "lv": 2}, {"x": 138, "y": 537, "lv": 2}, {"x": 237, "y": 768, "lv": 2}, {"x": 537, "y": 1038, "lv": 2}, {"x": 738, "y": 957, "lv": 2}, {"x": 1068, "y": 666, "lv": 2}, {"x": 957, "y": 438, "lv": 2}, {"x": 567, "y": 327, "lv": 3}, {"x": 327, "y": 567, "lv": 3}, {"x": 633, "y": 867, "lv": 3}, {"x": 867, "y": 633, "lv": 3} ] },
+    "tech": { "name": "技術ステーション", "color": "#FFEB3B", "coords": [ {"x": 957, "y": 237, "lv": 1}, {"x": 666, "y": 267, "lv": 1}, {"x": 237, "y": 237, "lv": 1}, {"x": 267, "y": 537, "lv": 1}, {"x": 237, "y": 957, "lv": 1}, {"x": 537, "y": 936, "lv": 1}, {"x": 936, "y": 537, "lv": 1}, {"x": 957, "y": 537, "lv": 1}, {"x": 408, "y": 327, "lv": 3}, {"x": 327, "y": 408, "lv": 3}, {"x": 792, "y": 867, "lv": 3}, {"x": 867, "y": 792, "lv": 3} ] },
+    "weapon": { "name": "武器ステーション", "color": "#E040FB", "coords": [ {"x": 867, "y": 138, "lv": 2}, {"x": 366, "y": 138, "lv": 2}, {"x": 138, "y": 438, "lv": 2}, {"x": 138, "y": 867, "lv": 2}, {"x": 327, "y": 1068, "lv": 2}, {"x": 867, "y": 1068, "lv": 2}, {"x": 1068, "y": 327, "lv": 2}, {"x": 1068, "y": 867, "lv": 2} ] },
+    "gathering": { "name": "採取ステーション", "color": "#4CAF50", "coords": [ {"x": 768, "y": 138, "lv": 1}, {"x": 450, "y": 138, "lv": 1}, {"x": 138, "y": 327, "lv": 1}, {"x": 138, "y": 768, "lv": 1}, {"x": 438, "y": 1068, "lv": 1}, {"x": 738, "y": 1068, "lv": 1}, {"x": 1068, "y": 438, "lv": 1}, {"x": 1068, "y": 738, "lv": 1} ] },
+    "production": { "name": "生産ステーション", "color": "#FF9800", "coords": [ {"x": 267, "y": 438, "lv": 2}, {"x": 438, "y": 237, "lv": 2}, {"x": 768, "y": 237, "lv": 2}, {"x": 936, "y": 408, "lv": 2}, {"x": 936, "y": 792, "lv": 2}, {"x": 768, "y": 963, "lv": 2}, {"x": 438, "y": 963, "lv": 2}, {"x": 267, "y": 768, "lv": 2} ] },
+    "training": { "name": "訓練ステーション", "color": "#795548", "coords": [ {"x": 366, "y": 267, "lv": 1}, {"x": 837, "y": 267, "lv": 1}, {"x": 936, "666, "lv": 1}, {"x": 837, "y": 936, "lv": 1}, {"x": 366, "y": 936, "lv": 1}, {"x": 267, "y": 666, "lv": 1} ] },
+    "expedition": { "name": "遠征ステーション", "color": "#607D8B", "coords": [ {"x": 537, "y": 267, "lv": 2}, {"x": 936, "y": 327, "lv": 2}, {"x": 666, "y": 936, "lv": 2}, {"x": 267, "y": 867, "lv": 2} ] }
+};
+
+let userState = {
+    version: STORAGE_VERSION,
+    activeTypes: Object.keys(stationData),
+    timers: {} // key: "type-index", value: startTime(ms)
+};
+
+// 初期化
+function init() {
+    loadLocalStorage();
+    renderFilters();
+    renderStations();
+    updateClocks();
+    setInterval(updateClocks, 1000);
+    setInterval(updateTimers, 1000);
+}
+
+function loadLocalStorage() {
+    const saved = localStorage.getItem('wos_station_data');
+    if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.version === STORAGE_VERSION) {
+            userState = parsed;
+        } else {
+            // バージョンが違う場合の互換性処理（今回は1.0.0なのでそのまま）
+            userState = { ...userState, ...parsed, version: STORAGE_VERSION };
+        }
+    }
+}
+
+function saveData() {
+    localStorage.setItem('wos_station_data', JSON.stringify(userState));
+}
+
+function renderFilters() {
+    const container = document.getElementById('filter-container');
+    container.innerHTML = '';
+    Object.keys(stationData).forEach(key => {
+        const btn = document.createElement('button');
+        btn.className = `btn filter-btn ${userState.activeTypes.includes(key) ? 'active' : ''}`;
+        btn.style.color = stationData[key].color;
+        btn.innerText = stationData[key].name;
+        btn.onclick = () => toggleType(key);
+        container.appendChild(btn);
+    });
+}
+
+function toggleType(key) {
+    if (userState.activeTypes.includes(key)) {
+        userState.activeTypes = userState.activeTypes.filter(k => k !== key);
+    } else {
+        userState.activeTypes.push(key);
+    }
+    saveData();
+    renderFilters();
+    renderStations();
+}
+
+function renderStations() {
+    const container = document.getElementById('station-list');
+    container.innerHTML = '';
+
+    Object.entries(stationData).forEach(([typeKey, info]) => {
+        if (!userState.activeTypes.includes(typeKey)) return;
+
+        info.coords.forEach((coord, index) => {
+            const id = `${typeKey}-${index}`;
+            const card = document.createElement('div');
+            card.className = 'station-card';
+            card.style.borderLeftColor = info.color;
+            
+            const startTime = userState.timers[id];
+            
+            card.innerHTML = `
+                <div style="font-weight:bold">${info.name} Lv.${coord.lv}</div>
+                <div>座標: X:${coord.x} Y:${coord.y}</div>
+                <div id="time-display-${id}">
+                    ${startTime ? renderTimeContent(id, startTime) : '<button class="btn btn-start" onclick="startTimer(\''+id+'\')">保護開始</button>'}
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    });
+}
+
+function renderTimeContent(id, startTime) {
+    const endTime = startTime + PROTECT_DURATION;
+    const endJST = new Date(endTime).toLocaleString('ja-JP');
+    const endUTC = new Date(endTime).toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+
+    return `
+        <div class="time-info">
+            終了(JST): ${endJST}<br>
+            終了(UTC): ${endUTC}
+        </div>
+        <div class="countdown" id="count-${id}">--:--:--</div>
+        <div style="margin-top:5px">
+            <button class="btn btn-adjust" onclick="adjustTime('${id}', -60000)">-1分</button>
+            <button class="btn btn-adjust" onclick="adjustTime('${id}', 60000)">+1分</button>
+            <button class="btn btn-reset" onclick="resetTimer('${id}')">リセット</button>
+        </div>
+    `;
+}
+
+function startTimer(id) {
+    userState.timers[id] = Date.now();
+    saveData();
+    renderStations();
+}
+
+function resetTimer(id) {
+    if (confirm('タイマーをリセットしますか？')) {
+        delete userState.timers[id];
+        saveData();
+        renderStations();
+    }
+}
+
+function adjustTime(id, ms) {
+    if (userState.timers[id]) {
+        userState.timers[id] += ms;
+        saveData();
+        renderStations();
+    }
+}
+
+function updateClocks() {
+    const now = new Date();
+    document.getElementById('jst-clock').innerText = now.toLocaleString('ja-JP');
+    document.getElementById('utc-clock').innerText = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+}
+
+function updateTimers() {
+    const now = Date.now();
+    Object.entries(userState.timers).forEach(([id, startTime]) => {
+        const el = document.getElementById(`count-${id}`);
+        if (!el) return;
+
+        const remaining = (startTime + PROTECT_DURATION) - now;
+        if (remaining <= 0) {
+            el.innerText = "保護終了";
+            el.style.color = "#aaa";
+        } else {
+            const h = Math.floor(remaining / 3600000);
+            const m = Math.floor((remaining % 3600000) / 60000);
+            const s = Math.floor((remaining % 60000) / 1000);
+            el.innerText = `${h}h ${m}m ${s}s`;
+        }
+    });
+}
+
+// インポート・エクスポート
+function exportData() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(userState));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `wos_station_v${STORAGE_VERSION}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+}
+
+function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const imported = JSON.parse(e.target.result);
+            userState = imported;
+            saveData();
+            location.reload();
+        } catch (err) {
+            alert('ファイルの読み込みに失敗しました。');
+        }
+    };
+    reader.readAsText(file);
+}
+
+init();
+</script>
+
+</body>
+</html>
