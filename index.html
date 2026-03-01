@@ -2,11 +2,11 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>工程ステーション管理 v2.0.0</title>
+    <title>工程ステーション管理 v2.2.0</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --enemy: #ff5252; --own: #448AFF; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 15px; padding-bottom: 240px; }
-        .controls { background: #222; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; position: sticky; top: 10px; z-index: 100; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 15px; padding-bottom: 240px; font-size: 14px; }
+        .controls { background: #222; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; position: sticky; top: 10px; z-index: 100; display: flex; gap: 10px; align-items: center; }
         .btn { cursor: pointer; padding: 8px 12px; border: none; border-radius: 4px; background: #444; color: white; font-weight: bold; }
         .btn-add { background: #2e7d32; }
         .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
@@ -15,138 +15,137 @@
         .station-card.enemy { border-color: var(--enemy); background: linear-gradient(145deg, #1e1e1e, #300); }
         .countdown { font-size: 1.8rem; font-weight: bold; color: #ff5252; font-family: monospace; margin: 8px 0; }
         
-        /* 追加用モーダル */
-        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; overflow-y: auto; }
-        .modal-content { background: #222; margin: 5% auto; padding: 20px; width: 90%; max-width: 600px; border-radius: 8px; }
+        /* モーダル */
+        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; }
+        .modal-content { background: #222; margin: 2% auto; padding: 20px; width: 95%; max-width: 700px; height: 85vh; border-radius: 8px; display: flex; flex-direction: column; }
+        .modal-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; background: #333; padding: 10px; border-radius: 4px; }
+        .modal-scroll { flex: 1; overflow-y: auto; border-top: 1px solid #444; }
         .modal-item { padding: 10px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        .modal-item:hover { background: #2a2a2a; }
+        
         .summary-panel { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; border-top: 3px solid var(--accent); padding: 12px; z-index: 1000; }
+        input, select { background: #111; color: #fff; border: 1px solid #555; padding: 5px; border-radius: 4px; }
     </style>
 </head>
 <body>
 
 <div class="controls">
-    <div style="display:flex; gap:10px;">
-        <button class="btn btn-add" onclick="showModal()">＋ 管理するステーションを追加</button>
-        <button class="btn" style="background:#4527a0" onclick="exportData()">バックアップ保存</button>
-        <button class="btn" onclick="document.getElementById('import-file').click()">読込</button>
-        <input type="file" id="import-file" style="display:none" onchange="importData(event)">
-    </div>
+    <button class="btn btn-add" onclick="showModal()">＋ ステーションを追加</button>
+    <div style="flex-grow: 1;"></div>
+    <button class="btn" style="background:#4527a0" onclick="exportData()">保存(JSON)</button>
+    <button class="btn" onclick="document.getElementById('import-file').click()">読込</button>
+    <input type="file" id="import-file" style="display:none" onchange="importData(event)">
 </div>
 
 <div id="station-list" class="station-grid"></div>
 
 <div id="modal">
     <div class="modal-content">
-        <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-            <h3>ステーションを選択</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h3>施設リストから追加</h3>
             <button class="btn" onclick="hideModal()">閉じる</button>
         </div>
-        <div id="modal-list"></div>
+        <div class="modal-filter">
+            <select id="f-type" onchange="filterModal()"><option value="">全施設</option></select>
+            <select id="f-lv" onchange="filterModal()"><option value="">全Lv</option></select>
+            <input type="text" id="f-search" placeholder="座標(x, y)で検索..." oninput="filterModal()">
+        </div>
+        <div id="modal-list" class="modal-scroll"></div>
     </div>
 </div>
 
 <div class="summary-panel">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <strong style="color:var(--accent)">⏳ 終了間近サマリー</strong>
+        <strong style="color:var(--accent)">⏳ 保護終了サマリー</strong>
         <button class="btn" style="background:#1565c0; font-size:0.7rem;" onclick="copySummaryText()">テキストコピー</button>
     </div>
-    <div id="summary-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:5px; max-height:150px; overflow-y:auto;"></div>
+    <div id="summary-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:5px; max-height:150px; overflow-y:auto;"></div>
 </div>
 
 <script>
-// 全座標データ（ここから選択する）
 const MASTER_DATA = {
-    "construction": { "name": "建築", "color": "#FF5252", "coords": [{"x": 1068, "y": 138, "lv": 1}, {"x": 486, "y": 327, "lv": 3}] },
-    "defense": { "name": "防御", "color": "#448AFF", "coords": [{"x": 666, "y": 138, "lv": 2}, {"x": 816, "y": 717, "lv": 4}] },
-    "tech": { "name": "技術", "color": "#FFEB3B", "coords": [{"x": 957, "y": 237, "lv": 1}, {"x": 867, "y": 327, "lv": 3}] },
-    "weapon": { "name": "武器", "color": "#E040FB", "coords": [{"x": 867, "y": 138, "lv": 2}, {"x": 816, "y": 486, "lv": 4}] },
-    "gathering": { "name": "採取", "color": "#4CAF50", "coords": [{"x": 957, "y": 138, "lv": 1}] },
-    "production": { "name": "生産", "color": "#FF9800", "coords": [{"x": 1068, "y": 237, "lv": 1}] },
-    "training": { "name": "訓練", "color": "#795548", "coords": [{"x": 366, "y": 267, "lv": 1}, {"x": 237, "y": 486, "lv": 2}] },
-    "expedition": { "name": "遠征", "color": "#607D8B", "coords": [{"x": 537, "y": 267, "lv": 2}, {"x": 768, "y": 327, "lv": 3}] },
-    "refining": { "name": "精錬", "color": "#00BCD4", "coords": [{"x": 666, "y": 588, "lv": 4}, {"x": 462, "y": 588, "lv": 5}] }
+    "construction": { "name": "建築", "coords": [{x:1068,y:138,lv:1},{x:537,y:138,lv:1},{x:138,y:138,lv:1},{x:138,y:666,lv:1},{x:138,y:1038,lv:1},{x:666,y:1068,lv:1},{x:1068,y:567,lv:1},{x:1068,y:1068,lv:1},{x:486,y:327,lv:3},{x:768,y:867,lv:3},{x:867,y:567,lv:3},{x:327,y:666,lv:3}] },
+    "defense": { "name": "防御", "coords": [{x:666,y:138,lv:2},{x:438,y:267,lv:2},{x:138,y:537,lv:2},{x:237,y:768,lv:2},{x:537,y:1038,lv:2},{x:738,y:957,lv:2},{x:1068,y:666,lv:2},{x:957,y:438,lv:2},{x:816,y:717,lv:4},{x:387,y:717,lv:4},{x:588,y:327,lv:4}] },
+    "tech": { "name": "技術", "coords": [{x:957,y:237,lv:1},{x:666,y:267,lv:1},{x:237,y:237,lv:1},{x:267,y:537,lv:1},{x:237,y:957,lv:1},{x:537,y:936,lv:1},{x:936,y:537,lv:1},{x:957,y:957,lv:1},{x:867,y:327,lv:3},{x:327,y:327,lv:3},{x:327,y:867,lv:3},{x:867,y:867,lv:3}] },
+    "weapon": { "name": "武器", "coords": [{x:867,y:138,lv:2},{x:366,y:138,lv:2},{x:138,y:438,lv:2},{x:138,y:867,lv:2},{x:438,y:1068,lv:2},{x:1068,y:327,lv:2},{x:1068,y:867,lv:2},{x:867,y:1068,lv:2},{x:816,y:486,lv:4},{x:387,y:486,lv:4},{x:588,y:867,lv:4}] },
+    "gathering": { "name": "採取", "coords": [{x:957,y:138,lv:1},{x:537,y:87,lv:1},{x:138,y:237,lv:1},{x:87,y:666,lv:1},{x:267,y:1068,lv:1},{x:636,y:1137,lv:1},{x:1137,y:567,lv:1},{x:1068,y:936,lv:1}] },
+    "production": { "name": "生産", "coords": [{x:1068,y:237,lv:1},{x:768,y:138,lv:1},{x:237,y:138,lv:1},{x:138,y:327,lv:1},{x:138,y:957,lv:1},{x:327,y:1038,lv:1},{x:1068,y:747,lv:1},{x:957,y:1068,lv:1}] },
+    "training": { "name": "訓練", "coords": [{x:237,y:486,lv:2},{x:138,y:747,lv:2},{x:486,y:957,lv:2},{x:768,y:1038,lv:2},{x:957,y:747,lv:2},{x:1068,y:486,lv:2},{x:486,y:138,lv:2},{x:768,y:237,lv:2}] },
+    "expedition": { "name": "遠征", "coords": [{x:768,y:327,lv:3},{x:327,y:567,lv:3},{x:486,y:867,lv:3},{x:867,y:666,lv:3}] }
 };
 
+const ALL_STATIONS = [];
+Object.entries(MASTER_DATA).forEach(([k, cat]) => {
+    cat.coords.forEach((c, i) => {
+        ALL_STATIONS.push({ id:`${k}-${c.lv}-${i}`, typeKey:k, typeName:cat.name, lv:c.lv, x:c.x, y:c.y });
+    });
+});
+
 let userState = { selectedIds: [], timers: {}, modes: {} };
-const STORAGE_KEY = 'wos_station_v200';
+const STORAGE_KEY = 'wos_v220_final';
 const DUR = 72 * 60 * 60 * 1000;
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
 function load() {
     const s = localStorage.getItem(STORAGE_KEY);
     if(s) userState = JSON.parse(s);
+    const tSel = document.getElementById('f-type');
+    Object.entries(MASTER_DATA).forEach(([k, v]) => tSel.innerHTML += `<option value="${k}">${v.name}</option>`);
+    const lSel = document.getElementById('f-lv');
+    [1,2,3,4].forEach(l => lSel.innerHTML += `<option value="${l}">Lv.${l}</option>`);
     render();
 }
 
-function showModal() {
-    const modal = document.getElementById('modal');
+function showModal() { document.getElementById('modal').style.display = 'block'; filterModal(); }
+function hideModal() { document.getElementById('modal').style.display = 'none'; }
+
+function filterModal() {
+    const type = document.getElementById('f-type').value;
+    const lv = document.getElementById('f-lv').value;
+    const search = document.getElementById('f-search').value;
     const list = document.getElementById('modal-list');
-    modal.style.display = 'block';
     list.innerHTML = '';
-    
-    Object.entries(MASTER_DATA).forEach(([key, category]) => {
-        category.coords.forEach((c, i) => {
-            const id = `${key}-${c.lv}-${i}`;
-            if (userState.selectedIds.includes(id)) return;
-            const div = document.createElement('div');
-            div.className = 'modal-item';
-            div.innerHTML = `
-                <span>${category.name} Lv.${c.lv} (${c.x}, ${c.y})</span>
-                <button class="btn btn-add" onclick="addStation('${id}')">追加</button>
-            `;
-            list.appendChild(div);
-        });
+
+    ALL_STATIONS.filter(s => {
+        const matchType = !type || s.typeKey === type;
+        const matchLv = !lv || s.lv == lv;
+        const matchSearch = !search || s.x == search || s.y == search;
+        const notAdded = !userState.selectedIds.includes(s.id);
+        return matchType && matchLv && matchSearch && notAdded;
+    }).forEach(s => {
+        const div = document.createElement('div');
+        div.className = 'modal-item';
+        div.innerHTML = `<span><b>${s.typeName} Lv.${s.lv}</b> (${s.x}, ${s.y})</span><button class="btn btn-add" onclick="addStation('${s.id}')">追加</button>`;
+        list.appendChild(div);
     });
 }
 
-function hideModal() { document.getElementById('modal').style.display = 'none'; }
-
-function addStation(id) {
-    userState.selectedIds.push(id);
-    userState.modes[id] = 'none';
-    save();
-    render();
-    hideModal();
-}
-
-function removeStation(id) {
-    if(confirm('管理リストから削除しますか？')) {
-        userState.selectedIds = userState.selectedIds.filter(x => x !== id);
-        delete userState.timers[id];
-        delete userState.modes[id];
-        save();
-        render();
-    }
-}
+function addStation(id) { userState.selectedIds.push(id); userState.modes[id] = 'none'; save(); render(); filterModal(); }
+function removeStation(id) { if(confirm('管理リストから外しますか？')) { userState.selectedIds = userState.selectedIds.filter(x => x !== id); delete userState.timers[id]; delete userState.modes[id]; save(); render(); } }
 
 function render() {
     const grid = document.getElementById('station-list');
     grid.innerHTML = '';
-    
     userState.selectedIds.forEach(id => {
-        const [key, lv, idx] = id.split('-');
-        const item = MASTER_DATA[key].coords[idx];
+        const s = ALL_STATIONS.find(x => x.id === id);
+        if(!s) return;
         const mode = userState.modes[id] || 'none';
         const t = userState.timers[id];
         const card = document.createElement('div');
         card.className = `station-card ${mode==='own'?'own':''} ${mode==='enemy'?'enemy':''}`;
-        
         card.innerHTML = `
-            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                <div style="display:flex; gap:4px;">
-                    <button class="btn" style="font-size:0.6rem; padding:2px 5px; background:${mode==='own'?'#448AFF':'#333'}" onclick="setMode('${id}','own')">自</button>
-                    <button class="btn" style="font-size:0.6rem; padding:2px 5px; background:${mode==='enemy'?'#ff5252':'#333'}" onclick="setMode('${id}','enemy')">敵</button>
-                    <button class="btn" style="font-size:0.6rem; padding:2px 5px; background:${mode==='none'?'#888':'#333'}" onclick="setMode('${id}','none')">無</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <div style="display:flex; gap:3px;">
+                    <button class="btn" style="padding:2px 6px; background:${mode==='own'?'var(--own)':'#333'}" onclick="setMode('${id}','own')">自</button>
+                    <button class="btn" style="padding:2px 6px; background:${mode==='enemy'?'var(--enemy)':'#333'}" onclick="setMode('${id}','enemy')">敵</button>
+                    <button class="btn" style="padding:2px 6px; background:${mode==='none'?'#888':'#333'}" onclick="setMode('${id}','none')">無</button>
                 </div>
-                <span style="cursor:pointer; color:#888;" onclick="removeStation('${id}')">&times;</span>
+                <span style="cursor:pointer; color:#777; font-size:1.2rem;" onclick="removeStation('${id}')">&times;</span>
             </div>
-            <div style="font-weight:bold;">${MASTER_DATA[key].name} Lv.${lv} <small>(${item.x}, ${item.y})</small></div>
+            <div style="font-weight:bold;">${s.typeName} Lv.${s.lv} <small style="color:#aaa">(${s.x}, ${s.y})</small></div>
             ${t ? `<div class="countdown" id="t-${id}">--:--:--</div>
-                   <div style="display:flex; gap:5px;">
-                       <button class="btn" style="background:#0277bd; flex:1" onclick="sync('${id}')">同期</button>
-                       <button class="btn" style="background:#c62828" onclick="resetTimer('${id}')">リセット</button>
-                   </div>` 
-                : `<button class="btn" style="background:#2e7d32; width:100%; margin-top:10px;" onclick="startTimer('${id}')">保護開始</button>`}
+                   <div style="display:flex; gap:5px;"><button class="btn" style="background:#0277bd; flex:1" onclick="sync('${id}')">同期</button><button class="btn" style="background:#c62828" onclick="resetTimer('${id}')">リセット</button></div>` 
+                : `<button class="btn" style="background:#2e7d32; width:100%; margin-top:10px;" onclick="startTimer('${id}')">今から72h保護開始</button>`}
         `;
         grid.appendChild(card);
     });
@@ -155,68 +154,47 @@ function render() {
 function setMode(id, m) { userState.modes[id] = m; save(); render(); }
 function startTimer(id) { userState.timers[id] = Date.now(); save(); render(); }
 function resetTimer(id) { delete userState.timers[id]; save(); render(); }
-
 function sync(id) {
-    const val = prompt("残り時間 (例: 1d 09:11:27)", "");
-    if (!val) return;
-    let s = 0;
-    const d = val.match(/(\d+)d/i); if(d) s += d[1] * 86400;
-    const pts = val.replace(/\d+d/i,'').replace(/[:：\s]/g,' ').trim().split(/\s+/);
-    if(pts.length===3) s += pts[0]*3600 + pts[1]*60 + pts[2]*1;
-    else if(pts.length===2) s += pts[0]*3600 + pts[1]*60;
-    else if(pts[0]!=="") s += pts[0]*3600;
-    userState.timers[id] = Date.now() + (s * 1000) - DUR;
-    save(); render();
+    const v = prompt("残り時間 (例: 1d 09:11:27)"); if(!v) return;
+    let s=0; const d=v.match(/(\d+)d/i); if(d) s+=d[1]*86400;
+    const pts=v.replace(/\d+d/i,'').replace(/[:：\s]/g,' ').trim().split(/\s+/);
+    if(pts.length===3) s+=pts[0]*3600+pts[1]*60+pts[2]*1;
+    else if(pts.length===2) s+=pts[0]*3600+pts[1]*60;
+    else if(pts[0]!=="") s+=pts[0]*3600;
+    userState.timers[id]=Date.now()+(s*1000)-DUR; save(); render();
 }
 
 function tick() {
     const now = Date.now();
-    const summaryItems = [];
+    const sum = [];
     userState.selectedIds.forEach(id => {
-        const el = document.getElementById(`t-${id}`);
         if(!userState.timers[id]) return;
         const diff = (userState.timers[id] + DUR) - now;
+        const el = document.getElementById(`t-${id}`);
         if(el) {
-            if(diff <= 0) { el.innerText = "終了"; el.style.color = "#888"; }
-            else {
-                const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
-                el.innerText = `${h}h ${m}m ${s}s`;
-            }
+            if(diff<=0){ el.innerText="終了"; el.style.color="#888"; }
+            else { const h=Math.floor(diff/3600000), m=Math.floor((diff%3600000)/60000), s=Math.floor((diff%60000)/1000); el.innerText=`${h}h ${m}m ${s}s`; }
         }
-        const [key, lv, idx] = id.split('-');
-        summaryItems.push({ name: `${MASTER_DATA[key].name} Lv.${lv}`, diff, mode: userState.modes[id] });
+        const s = ALL_STATIONS.find(x => x.id === id);
+        sum.push({ name: `${s.typeName} Lv.${s.lv}`, diff, mode: userState.modes[id] });
     });
-    
     const sList = document.getElementById('summary-list');
-    summaryItems.sort((a,b) => a.diff - b.diff);
-    sList.innerHTML = summaryItems.map(i => `
-        <div class="summary-item" style="background:#2a2a2a; padding:4px 8px; border-radius:4px; display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:3px; border-left:3px solid ${i.mode==='enemy'?'#ff5252':'#448AFF'}">
-            <span>${i.mode==='enemy'?'●敵':'○自'} ${i.name}</span>
-            <span style="font-family:monospace;">${Math.floor(Math.max(0,i.diff)/3600000)}h ${Math.floor((Math.max(0,i.diff)%3600000)/60000)}m</span>
-        </div>
-    `).join('');
+    sum.sort((a,b) => a.diff - b.diff);
+    sList.innerHTML = sum.map(i => `<div style="background:#2a2a2a; padding:4px 8px; border-radius:4px; display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:3px; border-left:3px solid ${i.mode==='enemy'?'#ff5252':'#448AFF'}"><span>${i.mode==='enemy'?'●敵':'○自'} ${i.name}</span><span style="font-family:monospace; font-weight:bold;">${Math.floor(Math.max(0,i.diff)/3600000)}h ${Math.floor((Math.max(0,i.diff)%3600000)/60000)}m</span></div>`).join('');
 }
 
 function copySummaryText() {
     let txt = "【ステーション保護状況】\n";
     const items = userState.selectedIds.filter(id => userState.timers[id]).map(id => {
-        const t = userState.timers[id] + DUR;
-        const [key, lv, idx] = id.split('-');
-        return { name: `${MASTER_DATA[key].name} Lv.${lv}`, diff: t - Date.now(), mode: userState.modes[id], end: new Date(t).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) };
+        const t = userState.timers[id] + DUR; const s = ALL_STATIONS.find(x => x.id === id);
+        return { name: `${s.typeName} Lv.${s.lv}`, diff: t - Date.now(), mode: userState.modes[id], end: new Date(t).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) };
     }).sort((a,b) => a.diff - b.diff);
     items.forEach(i => txt += `${i.mode==='enemy'?'●敵':'○自'} ${i.name}: 残 ${Math.floor(Math.max(0,i.diff)/3600000)}h ${Math.floor((Math.max(0,i.diff)%3600000)/60000)}m (${i.end})\n`);
     navigator.clipboard.writeText(txt).then(() => alert("コピーしました"));
 }
 
-function exportData() {
-    const blob = new Blob([JSON.stringify(userState)], {type:'application/json'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `wos_v2_backup.json`; a.click();
-}
-function importData(e) {
-    const reader = new FileReader();
-    reader.onload = (ev) => { try { userState = JSON.parse(ev.target.result); save(); render(); } catch(err){alert("失敗");} };
-    reader.readAsText(e.target.files[0]);
-}
+function exportData() { const b = new Blob([JSON.stringify(userState)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `wos_station_data.json`; a.click(); }
+function importData(e) { const r = new FileReader(); r.onload = (ev) => { try { userState = JSON.parse(ev.target.result); save(); render(); } catch(err){alert("失敗");} }; r.readAsText(e.target.files[0]); }
 
 window.onload = () => { load(); setInterval(tick, 1000); };
 </script>
