@@ -2,27 +2,24 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>工程ステーション管理 v2.2.0</title>
+    <title>工程ステーション管理 v2.2.1</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --enemy: #ff5252; --own: #448AFF; }
         body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 15px; padding-bottom: 240px; font-size: 14px; }
-        .controls { background: #222; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; position: sticky; top: 10px; z-index: 100; display: flex; gap: 10px; align-items: center; }
-        .btn { cursor: pointer; padding: 8px 12px; border: none; border-radius: 4px; background: #444; color: white; font-weight: bold; }
+        .controls { background: #222; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; position: sticky; top: 10px; z-index: 100; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .btn { cursor: pointer; padding: 8px 12px; border: none; border-radius: 4px; background: #444; color: white; font-weight: bold; font-size: 0.8rem; }
         .btn-add { background: #2e7d32; }
+        .btn-share { background: #00897b; }
         .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
         .station-card { background: var(--card); border-left: 6px solid #555; padding: 12px; border-radius: 6px; position: relative; border-top: 1px solid #333; }
         .station-card.own { border-color: var(--own); }
         .station-card.enemy { border-color: var(--enemy); background: linear-gradient(145deg, #1e1e1e, #300); }
         .countdown { font-size: 1.8rem; font-weight: bold; color: #ff5252; font-family: monospace; margin: 8px 0; }
-        
-        /* モーダル */
         #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; }
         .modal-content { background: #222; margin: 2% auto; padding: 20px; width: 95%; max-width: 700px; height: 85vh; border-radius: 8px; display: flex; flex-direction: column; }
         .modal-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; background: #333; padding: 10px; border-radius: 4px; }
         .modal-scroll { flex: 1; overflow-y: auto; border-top: 1px solid #444; }
         .modal-item { padding: 10px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
-        .modal-item:hover { background: #2a2a2a; }
-        
         .summary-panel { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; border-top: 3px solid var(--accent); padding: 12px; z-index: 1000; }
         input, select { background: #111; color: #fff; border: 1px solid #555; padding: 5px; border-radius: 4px; }
     </style>
@@ -31,6 +28,7 @@
 
 <div class="controls">
     <button class="btn btn-add" onclick="showModal()">＋ ステーションを追加</button>
+    <button class="btn btn-share" onclick="shareURL()">共有リンクを発行(復旧用)</button>
     <div style="flex-grow: 1;"></div>
     <button class="btn" style="background:#4527a0" onclick="exportData()">保存(JSON)</button>
     <button class="btn" onclick="document.getElementById('import-file').click()">読込</button>
@@ -82,18 +80,40 @@ Object.entries(MASTER_DATA).forEach(([k, cat]) => {
 });
 
 let userState = { selectedIds: [], timers: {}, modes: {} };
-const STORAGE_KEY = 'wos_v220_final';
+const STORAGE_KEY = 'wos_v221_master';
 const DUR = 72 * 60 * 60 * 1000;
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
+
 function load() {
-    const s = localStorage.getItem(STORAGE_KEY);
-    if(s) userState = JSON.parse(s);
+    // クエリパラメータからの復旧
+    const params = new URLSearchParams(window.location.search);
+    const d = params.get('d');
+    if (d) {
+        try {
+            userState = JSON.parse(decodeURIComponent(atob(d)));
+            save();
+            window.history.replaceState({}, '', location.pathname);
+            alert("共有リンクからデータを復元しました。");
+        } catch(e) { console.error("URL Load Error"); }
+    } else {
+        const s = localStorage.getItem(STORAGE_KEY);
+        if(s) userState = JSON.parse(s);
+    }
+    
     const tSel = document.getElementById('f-type');
     Object.entries(MASTER_DATA).forEach(([k, v]) => tSel.innerHTML += `<option value="${k}">${v.name}</option>`);
     const lSel = document.getElementById('f-lv');
     [1,2,3,4].forEach(l => lSel.innerHTML += `<option value="${l}">Lv.${l}</option>`);
     render();
+}
+
+function shareURL() {
+    const b64 = btoa(encodeURIComponent(JSON.stringify(userState)));
+    const url = window.location.origin + window.location.pathname + "?d=" + b64;
+    navigator.clipboard.writeText(url).then(() => {
+        alert("現在のデータを100%復旧できるURLをコピーしました。\nブラウザのブックマークに登録しておくことを強く推奨します。");
+    });
 }
 
 function showModal() { document.getElementById('modal').style.display = 'block'; filterModal(); }
@@ -105,7 +125,6 @@ function filterModal() {
     const search = document.getElementById('f-search').value;
     const list = document.getElementById('modal-list');
     list.innerHTML = '';
-
     ALL_STATIONS.filter(s => {
         const matchType = !type || s.typeKey === type;
         const matchLv = !lv || s.lv == lv;
@@ -121,7 +140,7 @@ function filterModal() {
 }
 
 function addStation(id) { userState.selectedIds.push(id); userState.modes[id] = 'none'; save(); render(); filterModal(); }
-function removeStation(id) { if(confirm('管理リストから外しますか？')) { userState.selectedIds = userState.selectedIds.filter(x => x !== id); delete userState.timers[id]; delete userState.modes[id]; save(); render(); } }
+function removeStation(id) { if(confirm('管理を解除しますか？')) { userState.selectedIds = userState.selectedIds.filter(x => x !== id); delete userState.timers[id]; delete userState.modes[id]; save(); render(); } }
 
 function render() {
     const grid = document.getElementById('station-list');
@@ -144,7 +163,7 @@ function render() {
             </div>
             <div style="font-weight:bold;">${s.typeName} Lv.${s.lv} <small style="color:#aaa">(${s.x}, ${s.y})</small></div>
             ${t ? `<div class="countdown" id="t-${id}">--:--:--</div>
-                   <div style="display:flex; gap:5px;"><button class="btn" style="background:#0277bd; flex:1" onclick="sync('${id}')">同期</button><button class="btn" style="background:#c62828" onclick="resetTimer('${id}')">リセット</button></div>` 
+                   <div style="display:flex; gap:5px;"><button class="btn" style="background:#0277bd; flex:1" onclick="sync('${id}')">同期</button><button class="btn" style="background:#c62828" onclick="resetTimer('${id}')">解除</button></div>` 
                 : `<button class="btn" style="background:#2e7d32; width:100%; margin-top:10px;" onclick="startTimer('${id}')">今から72h保護開始</button>`}
         `;
         grid.appendChild(card);
@@ -153,7 +172,7 @@ function render() {
 
 function setMode(id, m) { userState.modes[id] = m; save(); render(); }
 function startTimer(id) { userState.timers[id] = Date.now(); save(); render(); }
-function resetTimer(id) { delete userState.timers[id]; save(); render(); }
+function resetTimer(id) { if(confirm('タイマーをリセットしますか？')) { delete userState.timers[id]; save(); render(); } }
 function sync(id) {
     const v = prompt("残り時間 (例: 1d 09:11:27)"); if(!v) return;
     let s=0; const d=v.match(/(\d+)d/i); if(d) s+=d[1]*86400;
@@ -190,10 +209,10 @@ function copySummaryText() {
         return { name: `${s.typeName} Lv.${s.lv}`, diff: t - Date.now(), mode: userState.modes[id], end: new Date(t).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) };
     }).sort((a,b) => a.diff - b.diff);
     items.forEach(i => txt += `${i.mode==='enemy'?'●敵':'○自'} ${i.name}: 残 ${Math.floor(Math.max(0,i.diff)/3600000)}h ${Math.floor((Math.max(0,i.diff)%3600000)/60000)}m (${i.end})\n`);
-    navigator.clipboard.writeText(txt).then(() => alert("コピーしました"));
+    navigator.clipboard.writeText(txt).then(() => alert("サマリーをコピーしました"));
 }
 
-function exportData() { const b = new Blob([JSON.stringify(userState)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `wos_station_data.json`; a.click(); }
+function exportData() { const b = new Blob([JSON.stringify(userState)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `wos_station_backup.json`; a.click(); }
 function importData(e) { const r = new FileReader(); r.onload = (ev) => { try { userState = JSON.parse(ev.target.result); save(); render(); } catch(err){alert("失敗");} }; r.readAsText(e.target.files[0]); }
 
 window.onload = () => { load(); setInterval(tick, 1000); };
