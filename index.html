@@ -3,22 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>[v2.5.3] 工程ステーション管理</title>
+    <title>[v2.5.5] 工程ステーション管理</title>
     <style>
-        :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --enemy: #ff5252; --own: #448AFF; }
+        :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --enemy: #ff5252; --own: #448AFF; 
+                --status-danger: #ff5252; --status-warning: #ffd740; --status-safe: #b2ebf2; }
         body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 10px; padding-bottom: 260px; font-size: 15px; }
         
-        /* 操作パネルの改善 */
         .controls { background: #222; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; position: sticky; top: 5px; z-index: 100; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .version-tag { font-size: 0.75rem; color: #888; background: #333; padding: 3px 8px; border-radius: 4px; border: 1px solid #444; }
         
-        /* ボタンの大型化 */
-        .btn { cursor: pointer; padding: 12px 16px; border: none; border-radius: 6px; background: #444; color: white; font-weight: bold; font-size: 0.9rem; transition: opacity 0.2s; }
+        .btn { cursor: pointer; padding: 12px 16px; border: none; border-radius: 6px; background: #444; color: white; font-weight: bold; font-size: 0.9rem; transition: opacity 0.2s; text-align: center; }
         .btn:active { opacity: 0.7; }
         .btn-add { background: #2e7d32; flex-grow: 1; }
         .btn-share { background: #00897b; flex-grow: 1; }
         
-        /* グリッドをスマホで1列、PCで複数列に */
         .station-grid { display: grid; grid-template-columns: 1fr; gap: 15px; }
         @media (min-width: 600px) { .station-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); } }
         
@@ -26,20 +24,22 @@
         .station-card.own { border-color: var(--own); }
         .station-card.enemy { border-color: var(--enemy); background: linear-gradient(145deg, #1e1e1e, #300); }
         
-        /* 文字の大型化 */
         .card-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 5px; }
-        .countdown { font-size: 2.2rem; font-weight: bold; color: #ff5252; font-family: monospace; margin: 8px 0; }
+        
+        .countdown { font-size: 2.2rem; font-weight: bold; font-family: monospace; margin: 8px 0; }
+        .cd-danger { color: var(--status-danger); }
+        .cd-warning { color: var(--status-warning); }
+        .cd-safe { color: var(--status-safe); opacity: 0.8; }
+        
         .jst-time { font-size: 0.95rem; color: #aaa; margin-bottom: 12px; }
         
-        /* モーダル */
         #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; }
         .modal-content { background: #222; margin: 2% auto; padding: 15px; width: 92%; max-width: 700px; height: 90vh; border-radius: 10px; display: flex; flex-direction: column; }
         .modal-item { padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-size: 1rem; }
 
-        /* 下部サマリーパネルの強化 */
         .summary-panel { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; border-top: 4px solid var(--accent); padding: 15px; z-index: 1000; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
         .summary-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .btn-copy-main { background: var(--own); font-size: 1rem; padding: 12px 25px; box-shadow: 0 0 10px rgba(68,138,255,0.4); }
+        .btn-copy-main { background: var(--own); font-size: 1rem; padding: 12px 25px; }
         
         input, select { background: #111; color: #fff; border: 1px solid #555; padding: 10px; border-radius: 6px; font-size: 1rem; }
     </style>
@@ -47,7 +47,7 @@
 <body>
 
 <div class="controls">
-    <div class="version-tag">v2.5.3</div>
+    <div class="version-tag">v2.5.5</div>
     <button class="btn btn-add" onclick="showModal()">＋ 追加</button>
     <button class="btn btn-share" onclick="shareURL()">🔗 短縮リンク</button>
     <div style="width:100%; display:flex; gap:10px;">
@@ -86,7 +86,7 @@
 </div>
 
 <script>
-// --- ロジック部分は v2.5.2 を継承 (定数・関数はそのまま保持) ---
+// --- 基本データ ---
 const MASTER_DATA = {
     "construction": { "name": "建築", "coords": [{x:1068,y:138,lv:1},{x:537,y:138,lv:1},{x:138,y:138,lv:1},{x:138,y:666,lv:1},{x:138,y:1038,lv:1},{x:666,y:1068,lv:1},{x:1068,y:567,lv:1},{x:1068,y:1068,lv:1},{x:486,y:327,lv:3},{x:768,y:867,lv:3},{x:867,y:567,lv:3},{x:327,y:666,lv:3}] },
     "defense": { "name": "防御", "coords": [{x:666,y:138,lv:2},{x:438,y:267,lv:2},{x:138,y:537,lv:2},{x:237,y:768,lv:2},{x:537,y:1038,lv:2},{x:738,y:957,lv:2},{x:1068,y:666,lv:2},{x:957,y:438,lv:2},{x:816,y:717,lv:4},{x:387,y:717,lv:4},{x:588,y:327,lv:4}] },
@@ -106,23 +106,11 @@ Object.entries(MASTER_DATA).forEach(([k, cat]) => {
 });
 
 let userState = { selectedIds: [], timers: {}, modes: {} };
-const STORAGE_KEY = 'wos_v253_master';
+const STORAGE_KEY = 'wos_v255_master';
 const DUR = 72 * 60 * 60 * 1000;
 const EPOCH = 1735689600;
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
-
-function shareURL() {
-    if (!userState.selectedIds.length) return;
-    const parts = userState.selectedIds.map(id => {
-        const idx = ALL_STATIONS.findIndex(s => s.id === id);
-        const mode = userState.modes[id] === 'own' ? 1 : (userState.modes[id] === 'enemy' ? 2 : 0);
-        const time = userState.timers[id] ? Math.floor(userState.timers[id]/1000 - EPOCH).toString(36) : "";
-        return `${idx.toString(36)}.${mode}.${time}`;
-    });
-    const url = window.location.origin + window.location.pathname + "?v=" + parts.join('_');
-    navigator.clipboard.writeText(url).then(() => alert("短縮URLをコピーしました"));
-}
 
 function load() {
     const params = new URLSearchParams(window.location.search);
@@ -149,6 +137,86 @@ function load() {
     render();
 }
 
+// --- 並び替えロジックを含む描画 ---
+function render() {
+    const grid = document.getElementById('station-list'); grid.innerHTML = '';
+    
+    // 表示用の配列を作成してソート
+    const sortedIds = [...userState.selectedIds].sort((a, b) => {
+        const timeA = userState.timers[a] ? userState.timers[a] + DUR : Infinity;
+        const timeB = userState.timers[b] ? userState.timers[b] + DUR : Infinity;
+        return timeA - timeB; // 時間が近い順。タイマーなしは最後。
+    });
+
+    sortedIds.forEach(id => {
+        const s = ALL_STATIONS.find(x => x.id === id); if(!s) return;
+        const mode = userState.modes[id] || 'none', t = userState.timers[id];
+        const card = document.createElement('div'); card.className = `station-card ${mode==='own'?'own':''} ${mode==='enemy'?'enemy':''}`;
+        card.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div style="display:flex; gap:5px;">
+                    <button class="btn" style="padding:8px 15px; background:${mode==='own'?'var(--own)':'#333'}" onclick="setMode('${id}','own')">自軍</button>
+                    <button class="btn" style="padding:8px 15px; background:${mode==='enemy'?'var(--enemy)':'#333'}" onclick="setMode('${id}','enemy')">敵軍</button>
+                </div>
+                <span style="cursor:pointer; color:#777; font-size:2rem; padding:0 10px;" onclick="removeStation('${id}')">&times;</span>
+            </div>
+            <div class="card-title">${s.typeName} Lv.${s.lv} <small style="color:#aaa">(${s.x}, ${s.y})</small></div>
+            ${t ? `<div class="countdown" id="t-${id}">--:--:--</div><div class="jst-time" id="jst-${id}">--/-- --:--:--</div>
+                   <div style="display:flex; gap:10px;"><button class="btn" style="background:#0277bd; flex:1" onclick="sync('${id}')">同期</button><button class="btn" style="background:#c62828" onclick="resetTimer('${id}')">解除</button></div>` 
+                : `<button class="btn" style="background:#2e7d32; width:100%; margin-top:10px; font-size:1.1rem;" onclick="startTimer('${id}')">72h 保護開始</button>`}
+        `;
+        grid.appendChild(card);
+    });
+}
+
+// --- タイマー・モード制御 ---
+function setMode(id, m) { userState.modes[id] = m; save(); render(); }
+function startTimer(id) { userState.timers[id] = Date.now(); save(); render(); }
+function resetTimer(id) { if(confirm('解除しますか？')) { delete userState.timers[id]; save(); render(); } }
+function sync(id) {
+    const v = prompt("残り時間 (1d 09:11:27)"); if(!v) return;
+    let s=0; const d=v.match(/(\d+)d/i); if(d) s+=d[1]*86400;
+    const pts=v.replace(/\d+d/i,'').replace(/[:：\s]/g,' ').trim().split(/\s+/);
+    if(pts.length===3) s+=pts[0]*3600+pts[1]*60+pts[2]*1;
+    else if(pts.length===2) s+=pts[0]*3600+pts[1]*60;
+    else if(pts[0]!=="") s+=pts[0]*3600;
+    userState.timers[id]=Date.now()+(s*1000)-DUR; save(); render();
+}
+
+function tick() {
+    const now = Date.now(); const sum = [];
+    userState.selectedIds.forEach(id => {
+        if(!userState.timers[id]) return;
+        const endTime = userState.timers[id] + DUR, diff = endTime - now;
+        const el = document.getElementById(`t-${id}`), jstEl = document.getElementById(`jst-${id}`);
+        if(el) {
+            el.classList.remove('cd-danger', 'cd-warning', 'cd-safe');
+            if(diff <= 0) { el.innerText = "争奪中"; el.classList.add('cd-danger'); }
+            else { 
+                el.innerText = `${Math.floor(diff/3600000)}h ${Math.floor((diff%3600000)/60000)}m ${Math.floor((diff%60000)/1000)}s`;
+                if(diff <= 3600000) el.classList.add('cd-warning'); else el.classList.add('cd-safe');
+            }
+        }
+        if(jstEl) {
+            const date = new Date(endTime);
+            const days = ['日','月','火','水','木','金','土'];
+            jstEl.innerText = `${date.getMonth()+1}/${date.getDate()}(${days[date.getDay()]}) ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}:${date.getSeconds().toString().padStart(2,'0')}`;
+        }
+        const s = ALL_STATIONS.find(x => x.id === id); sum.push({ name: `${s.typeName} Lv.${s.lv}`, diff, mode: userState.modes[id], jst: jstEl?jstEl.innerText:'' });
+    });
+    sum.sort((a,b) => a.diff - b.diff);
+    document.getElementById('summary-list').innerHTML = sum.map(i => {
+        let cls = i.diff <= 0 ? 'color:var(--status-danger); font-weight:bold;' : (i.diff <= 3600000 ? 'color:var(--status-warning); font-weight:bold;' : 'color:#ccc;');
+        return `<div style="background:#2a2a2a; padding:6px 10px; border-radius:4px; display:flex; justify-content:space-between; font-size:0.9rem; border-left:4px solid ${i.mode==='enemy'?'#ff5252':'#448AFF'}; ${cls}">
+            <span>${i.mode==='enemy'?'●':'○'} ${i.name}</span>
+            <span style="font-family:monospace;">${i.diff <= 0 ? '争奪中' : Math.floor(i.diff/3600000)+'h '+Math.floor((i.diff%3600000)/60000)+'m'}</span>
+        </div>`;
+    }).join('');
+}
+
+// --- ユーティリティ ---
+function showModal() { document.getElementById('modal').style.display = 'block'; filterModal(); }
+function hideModal() { document.getElementById('modal').style.display = 'none'; }
 function onTypeChange() {
     const type = document.getElementById('f-type').value, lvSel = document.getElementById('f-lv'), prevLv = lvSel.value;
     lvSel.innerHTML = '<option value="">全Lv</option>';
@@ -159,8 +227,6 @@ function onTypeChange() {
     }
     filterModal();
 }
-function showModal() { document.getElementById('modal').style.display = 'block'; filterModal(); }
-function hideModal() { document.getElementById('modal').style.display = 'none'; }
 function filterModal() {
     const type = document.getElementById('f-type').value, lv = document.getElementById('f-lv').value, search = document.getElementById('f-search').value;
     const list = document.getElementById('modal-list'); list.innerHTML = '';
@@ -176,66 +242,14 @@ function filterModal() {
 function addStation(id) { userState.selectedIds.push(id); userState.modes[id] = 'none'; save(); render(); filterModal(); }
 function removeStation(id) { if(confirm('解除しますか？')) { userState.selectedIds = userState.selectedIds.filter(x => x !== id); delete userState.timers[id]; delete userState.modes[id]; save(); render(); } }
 
-function render() {
-    const grid = document.getElementById('station-list'); grid.innerHTML = '';
-    userState.selectedIds.forEach(id => {
-        const s = ALL_STATIONS.find(x => x.id === id); if(!s) return;
-        const mode = userState.modes[id] || 'none', t = userState.timers[id];
-        const card = document.createElement('div'); card.className = `station-card ${mode==='own'?'own':''} ${mode==='enemy'?'enemy':''}`;
-        card.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <div style="display:flex; gap:5px;">
-                    <button class="btn" style="padding:8px 15px; background:${mode==='own'?'var(--own)':'#333'}" onclick="setMode('${id}','own')">自軍</button>
-                    <button class="btn" style="padding:8px 15px; background:${mode==='enemy'?'var(--enemy)':'#333'}" onclick="setMode('${id}','敵軍')">敵軍</button>
-                </div>
-                <span style="cursor:pointer; color:#777; font-size:2rem; padding:0 10px;" onclick="removeStation('${id}')">&times;</span>
-            </div>
-            <div class="card-title">${s.typeName} Lv.${s.lv} <small style="color:#aaa">(${s.x}, ${s.y})</small></div>
-            ${t ? `<div class="countdown" id="t-${id}">--:--:--</div><div class="jst-time" id="jst-${id}">--/-- --:--:--</div>
-                   <div style="display:flex; gap:10px;"><button class="btn" style="background:#0277bd; flex:1" onclick="sync('${id}')">残り時間同期</button><button class="btn" style="background:#c62828" onclick="resetTimer('${id}')">解除</button></div>` 
-                : `<button class="btn" style="background:#2e7d32; width:100%; margin-top:10px; font-size:1.1rem;" onclick="startTimer('${id}')">72h 保護開始</button>`}
-        `;
-        grid.appendChild(card);
-    });
-}
-
-function setMode(id, m) { userState.modes[id] = m === '敵軍' ? 'enemy' : (m === 'own' ? 'own' : 'none'); save(); render(); }
-function startTimer(id) { userState.timers[id] = Date.now(); save(); render(); }
-function resetTimer(id) { if(confirm('タイマーを解除しますか？')) { delete userState.timers[id]; save(); render(); } }
-function sync(id) {
-    const v = prompt("残り時間を入力 (例: 1d 09:11:27)"); if(!v) return;
-    let s=0; const d=v.match(/(\d+)d/i); if(d) s+=d[1]*86400;
-    const pts=v.replace(/\d+d/i,'').replace(/[:：\s]/g,' ').trim().split(/\s+/);
-    if(pts.length===3) s+=pts[0]*3600+pts[1]*60+pts[2]*1;
-    else if(pts.length===2) s+=pts[0]*3600+pts[1]*60;
-    else if(pts[0]!=="") s+=pts[0]*3600;
-    userState.timers[id]=Date.now()+(s*1000)-DUR; save(); render();
-}
-function formatJST(date) {
-    const days = ['日','月','火','水','木','金','土'];
-    return `${date.getMonth()+1}/${date.getDate()}(${days[date.getDay()]}) ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}:${date.getSeconds().toString().padStart(2,'0')}`;
-}
-
-function tick() {
-    const now = Date.now(); const sum = [];
-    userState.selectedIds.forEach(id => {
-        if(!userState.timers[id]) return;
-        const endTime = userState.timers[id] + DUR, diff = endTime - now;
-        const el = document.getElementById(`t-${id}`), jstEl = document.getElementById(`jst-${id}`);
-        if(el) el.innerText = diff<=0?"争奪中":`${Math.floor(diff/3600000)}h ${Math.floor((diff%3600000)/60000)}m ${Math.floor((diff%60000)/1000)}s`;
-        if(jstEl) jstEl.innerText = formatJST(new Date(endTime));
-        const s = ALL_STATIONS.find(x => x.id === id); sum.push({ name: `${s.typeName} Lv.${s.lv}`, diff, mode: userState.modes[id], jst: formatJST(new Date(endTime)) });
-    });
-    sum.sort((a,b) => a.diff - b.diff);
-    document.getElementById('summary-list').innerHTML = sum.map(i => `<div style="background:#2a2a2a; padding:6px 10px; border-radius:4px; display:flex; justify-content:space-between; font-size:0.9rem; border-left:4px solid ${i.mode==='enemy'?'#ff5252':'#448AFF'}"><span>${i.mode==='enemy'?'●':'○'} ${i.name}</span><span style="font-family:monospace;">${Math.floor(Math.max(0,i.diff)/3600000)}h ${Math.floor((Math.max(0,i.diff)%3600000)/60000)}m</span></div>`).join('');
-}
-
 function copySummaryText() {
     const isAll = document.getElementById('copy-all-flag').checked;
     let txt = isAll ? "【ステーション全状況】\n" : "【24h以内 保護終了】\n";
     const items = userState.selectedIds.filter(id => userState.timers[id]).map(id => {
         const t = userState.timers[id] + DUR; const s = ALL_STATIONS.find(x => x.id === id);
-        return { name: `${s.typeName} Lv.${s.lv}`, diff: t - Date.now(), mode: userState.modes[id], jst: formatJST(new Date(t)) };
+        const date = new Date(t); const days = ['日','月','火','水','木','金','土'];
+        const jst = `${date.getMonth()+1}/${date.getDate()}(${days[date.getDay()]}) ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}:${date.getSeconds().toString().padStart(2,'0')}`;
+        return { name: `${s.typeName} Lv.${s.lv}`, diff: t - Date.now(), mode: userState.modes[id], jst: jst };
     }).sort((a,b) => a.diff - b.diff);
     const filtered = isAll ? items : items.filter(i => i.diff > 0 && i.diff <= 24 * 60 * 60 * 1000);
     if (!filtered.length) { alert("対象がありません"); return; }
@@ -244,7 +258,19 @@ function copySummaryText() {
         const m = Math.floor((Math.max(0,i.diff)%3600000)/60000);
         txt += `${i.mode==='enemy'?'●敵':'○自'} ${i.name}: ${i.jst}\n　(残 ${h}h${m}m)\n`;
     });
-    navigator.clipboard.writeText(txt).then(() => alert("サマリーをコピーしました"));
+    navigator.clipboard.writeText(txt).then(() => alert("コピーしました"));
+}
+
+function shareURL() {
+    if (!userState.selectedIds.length) return;
+    const parts = userState.selectedIds.map(id => {
+        const idx = ALL_STATIONS.findIndex(s => s.id === id);
+        const mode = userState.modes[id] === 'own' ? 1 : (userState.modes[id] === 'enemy' ? 2 : 0);
+        const time = userState.timers[id] ? Math.floor(userState.timers[id]/1000 - EPOCH).toString(36) : "";
+        return `${idx.toString(36)}.${mode}.${time}`;
+    });
+    const url = window.location.origin + window.location.pathname + "?v=" + parts.join('_');
+    navigator.clipboard.writeText(url).then(() => alert("短縮URLをコピーしました"));
 }
 
 function exportData() { const b = new Blob([JSON.stringify(userState)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `wos_backup.json`; a.click(); }
