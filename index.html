@@ -7,12 +7,14 @@
 </head>
 <body>
 <div class="controls">
-    <div class="version-info">HTML: v3.4.0 | JS: <span id="js-version-tag">--</span></div>
+    <div class="version-info">HTML: v3.5.0 | JS: <span id="js-version-tag">--</span></div>
     <button class="btn" onclick="showModal()">＋ 追加</button>
     <button class="btn" onclick="shareURL()">🔗 共有リンク生成</button>
+    <button class="btn" onclick="exportData()">💾 保存</button>
+    <button class="btn" onclick="document.getElementById('import-file').click()">📂 読込</button>
+    <input type="file" id="import-file" style="display:none" onchange="importData(event)">
 </div>
 <div id="station-list" class="station-grid"></div>
-
 <div id="modal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -23,7 +25,6 @@
         <div id="modal-list"></div>
     </div>
 </div>
-
 <div class="summary-panel">
     <button class="btn" onclick="copySummaryText()">コピー</button>
     <div id="summary-list"></div>
