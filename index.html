@@ -2,17 +2,22 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>[v2.9.3] 施設管理-完全統合版</title>
+    <title>施設管理システム</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="header">
+        <h1>施設管理システム</h1>
+        <div id="version-display">ロジック: 読込中...</div>
+    </div>
+
     <div class="controls">
-        <div class="version">v2.9.3</div>
         <button class="btn" onclick="showModal()">＋ 追加</button>
         <button class="btn" onclick="exportData()">💾 保存</button>
         <button class="btn" onclick="document.getElementById('import-file').click()">📂 読込</button>
         <input type="file" id="import-file" style="display:none" onchange="importData(event)">
     </div>
+
     <div id="station-list" class="station-grid"></div>
 
     <div id="modal" class="modal-overlay">
