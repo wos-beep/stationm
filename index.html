@@ -2,17 +2,51 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>工程ステーション管理</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[v3.0.0] 工程ステーション管理</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="controls">
-        <button onclick="showModal()">＋ 追加</button>
-        <button onclick="exportData()">💾 保存</button>
-        <button onclick="document.getElementById('import-file').click()">📂 読込</button>
-        <input type="file" id="import-file" style="display:none" onchange="importData(event)">
+
+<div class="controls">
+    <div class="version-tag">v3.0.0</div>
+    <button class="btn btn-add" onclick="showModal()">＋ 追加</button>
+    <button class="btn btn-share" onclick="shareURL()">🔗 短縮リンク</button>
+    <div style="width:100%; display:flex; gap:10px;">
+        <button class="btn" style="background:#4527a0; flex:1" onclick="exportData()">保存(JSON)</button>
+        <button class="btn" style="flex:1" onclick="document.getElementById('import-file').click()">読込</button>
     </div>
-    <div id="station-list"></div>
-    <script src="script.js"></script>
+    <input type="file" id="import-file" style="display:none" onchange="importData(event)">
+</div>
+
+<div id="station-list" class="station-grid"></div>
+
+<div id="modal">
+    <div class="modal-content">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3>施設追加</h3>
+            <button class="btn" onclick="hideModal()" style="background:#666">閉じる</button>
+        </div>
+        <div class="modal-filter" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:15px;">
+            <select id="f-type" onchange="onTypeChange()" style="flex:1;"><option value="">全施設</option></select>
+            <select id="f-lv" onchange="filterModal()" style="flex:1;"><option value="">全Lv</option></select>
+        </div>
+        <input type="text" id="f-search" placeholder="座標検索..." oninput="filterModal()" style="width:100%; box-sizing:border-box; margin-bottom:15px;">
+        <div id="modal-list" style="flex: 1; overflow-y: auto; border-top: 1px solid #444;"></div>
+    </div>
+</div>
+
+<div class="summary-panel">
+    <div class="summary-header">
+        <strong style="color:var(--accent); font-size:1rem;">⏳ 24h以内 保護終了</strong>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <label style="font-size:0.9rem; color:#ccc;"><input type="checkbox" id="copy-all-flag" style="transform:scale(1.3);"> 全出力</label>
+            <button class="btn btn-copy-main" onclick="copySummaryText()">コピー</button>
+        </div>
+    </div>
+    <div id="summary-list" style="display:grid; grid-template-columns: 1fr; gap:6px; max-height:140px; overflow-y:auto;"></div>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>
