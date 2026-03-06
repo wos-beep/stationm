@@ -48,18 +48,27 @@ function render(sortedIds) {
 
 function renderChart() {
     const chart = document.getElementById('gantt-chart');
-    let html = '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">' + Array.from({length:8}, (_,i) => `<span style="font-size:10px; color:#888;">${i}日後</span>`).join('') + '</div>';
-    for(let i=0; i<=7; i++) html += `<div class="gantt-grid" style="left:${(i/7)*100}%"></div>`;
+    const DAYS = 4;
+    const now = Date.now();
+    const durationMs = DAYS * 86400000;
+    let html = '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">';
+    for(let i=0; i<=DAYS; i++) {
+        const d = new Date(now + (i * 86400000));
+        html += `<span style="font-size:10px; color:#aaa; width:${100/DAYS}%">${d.getMonth()+1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})</span>`;
+    }
+    html += '</div>';
+    for(let i=0; i<=DAYS; i++) html += `<div class="gantt-grid" style="left:${(i/DAYS)*100}%"></div>`;
     userState.selectedIds.forEach((id, index) => {
-        const start = userState.timers[id] || Date.now(), left = Math.max(0, (start - Date.now()) / (7 * 86400000) * 100);
-        const width = Math.min(100 - left, DUR / (7 * 86400000) * 100);
-        html += `<div class="gantt-bar ${userState.modes[id]}" style="left:${left}%; width:${width}%; top:${35 + (index % 6) * 12}px"></div>`;
+        const start = userState.timers[id] || now, left = Math.max(0, (start - now) / durationMs * 100);
+        const width = Math.min(100 - left, DUR / durationMs * 100);
+        const expiry = new Date(start + DUR);
+        html += `<div class="gantt-bar ${userState.modes[id]}" title="${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:00まで" style="left:${left}%; width:${width}%; top:${45 + (index % 8) * 15}px"></div>`;
     });
     chart.innerHTML = html;
 }
 
 function copySummaryText() { const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => isWindows() ? padSummaryLine(el.innerText) : el.innerText); navigator.clipboard.writeText(isWindows() ? entries.join('') : entries.join('\n')).then(() => alert("コピーしました")); }
-function shareURL() { const data = userState.selectedIds.map(id => ALL_STATIONS.findIndex(s => s.id === id) + "." + Math.floor(userState.timers[id] / 1000)).join("-"); const url = window.location.origin + window.location.pathname + "?d=" + data; navigator.clipboard.writeText(url).then(() => alert("URLをコピーしました (" + url.length + "文字)")); }
+function shareURL() { const data = userState.selectedIds.map(id => ALL_STATIONS.findIndex(s => s.id === id) + "." + Math.floor(userState.timers[id] / 1000)).join("-"); const url = window.location.origin + window.location.pathname + "?d=" + data; navigator.clipboard.writeText(url).then(() => alert("URLをコピーしました")); }
 function sync(id) { const val = prompt("残り時間を入力 (例: 1d 09 37 50)"); if(!val) return; let sec = 0, d = val.match(/(\d+)d/i); if(d) sec += parseInt(d[1])*86400; const n = val.replace(/\d+d/i,'').trim().split(/[:：\s]+/u).map(Number); if(n.length === 3) sec += n[0]*3600 + n[1]*60 + n[2]; else if(n.length === 4) sec += n[0]*86400 + n[1]*3600 + n[2]*60 + n[3]; userState.timers[id] = Date.now() + (sec*1000) - DUR; save(); tick(); }
 function exportData() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(userState)], {type: 'application/json'})); a.download = 'station_data.json'; a.click(); }
 function importData(e) { const reader = new FileReader(); reader.onload = (e) => { userState = JSON.parse(e.target.result); save(); tick(); }; reader.readAsText(e.target.files[0]); }
