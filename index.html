@@ -3,51 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>[v2.5.5] 工程ステーション管理</title>
+    <title>[v2.5.7] 工程ステーション管理</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --enemy: #ff5252; --own: #448AFF; 
                 --status-danger: #ff5252; --status-warning: #ffd740; --status-safe: #b2ebf2; }
         body { font-family: sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 10px; padding-bottom: 260px; font-size: 15px; }
-        
         .controls { background: #222; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; position: sticky; top: 5px; z-index: 100; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .version-tag { font-size: 0.75rem; color: #888; background: #333; padding: 3px 8px; border-radius: 4px; border: 1px solid #444; }
-        
         .btn { cursor: pointer; padding: 12px 16px; border: none; border-radius: 6px; background: #444; color: white; font-weight: bold; font-size: 0.9rem; transition: opacity 0.2s; text-align: center; }
         .btn:active { opacity: 0.7; }
         .btn-add { background: #2e7d32; flex-grow: 1; }
         .btn-share { background: #00897b; flex-grow: 1; }
-        
         .station-grid { display: grid; grid-template-columns: 1fr; gap: 15px; }
         @media (min-width: 600px) { .station-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); } }
-        
         .station-card { background: var(--card); border-left: 8px solid #555; padding: 15px; border-radius: 8px; position: relative; border-top: 1px solid #333; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .station-card.own { border-color: var(--own); }
         .station-card.enemy { border-color: var(--enemy); background: linear-gradient(145deg, #1e1e1e, #300); }
-        
         .card-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 5px; }
-        
         .countdown { font-size: 2.2rem; font-weight: bold; font-family: monospace; margin: 8px 0; }
         .cd-danger { color: var(--status-danger); }
         .cd-warning { color: var(--status-warning); }
         .cd-safe { color: var(--status-safe); opacity: 0.8; }
-        
         .jst-time { font-size: 0.95rem; color: #aaa; margin-bottom: 12px; }
-        
         #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; }
         .modal-content { background: #222; margin: 2% auto; padding: 15px; width: 92%; max-width: 700px; height: 90vh; border-radius: 10px; display: flex; flex-direction: column; }
         .modal-item { padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-size: 1rem; }
-
         .summary-panel { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; border-top: 4px solid var(--accent); padding: 15px; z-index: 1000; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
         .summary-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .btn-copy-main { background: var(--own); font-size: 1rem; padding: 12px 25px; }
-        
         input, select { background: #111; color: #fff; border: 1px solid #555; padding: 10px; border-radius: 6px; font-size: 1rem; }
     </style>
 </head>
 <body>
 
 <div class="controls">
-    <div class="version-tag">v2.5.5</div>
+    <div class="version-tag">v2.5.7</div>
     <button class="btn btn-add" onclick="showModal()">＋ 追加</button>
     <button class="btn btn-share" onclick="shareURL()">🔗 短縮リンク</button>
     <div style="width:100%; display:flex; gap:10px;">
@@ -86,7 +76,6 @@
 </div>
 
 <script>
-// --- 基本データ ---
 const MASTER_DATA = {
     "construction": { "name": "建築", "coords": [{x:1068,y:138,lv:1},{x:537,y:138,lv:1},{x:138,y:138,lv:1},{x:138,y:666,lv:1},{x:138,y:1038,lv:1},{x:666,y:1068,lv:1},{x:1068,y:567,lv:1},{x:1068,y:1068,lv:1},{x:486,y:327,lv:3},{x:768,y:867,lv:3},{x:867,y:567,lv:3},{x:327,y:666,lv:3}] },
     "defense": { "name": "防御", "coords": [{x:666,y:138,lv:2},{x:438,y:267,lv:2},{x:138,y:537,lv:2},{x:237,y:768,lv:2},{x:537,y:1038,lv:2},{x:738,y:957,lv:2},{x:1068,y:666,lv:2},{x:957,y:438,lv:2},{x:816,y:717,lv:4},{x:387,y:717,lv:4},{x:588,y:327,lv:4}] },
@@ -106,7 +95,7 @@ Object.entries(MASTER_DATA).forEach(([k, cat]) => {
 });
 
 let userState = { selectedIds: [], timers: {}, modes: {} };
-const STORAGE_KEY = 'wos_v255_master';
+const STORAGE_KEY = 'wos_v257_master';
 const DUR = 72 * 60 * 60 * 1000;
 const EPOCH = 1735689600;
 
@@ -137,15 +126,67 @@ function load() {
     render();
 }
 
-// --- 並び替えロジックを含む描画 ---
+// --- 文字幅計算とパディング(v2.5.7仕様) ---
+function getCharWidth(char) {
+    if (char === '|') return 0.5;
+    if (escape(char).length > 4) return 2.0;
+    return 1.0;
+}
+
+function formatLine(text) {
+    let w = 0;
+    for (let char of text) w += getCharWidth(char);
+    
+    let padded = text;
+    let diff = 32.0 - w;
+    
+    // 全角(2pt)と半角(1pt)で調整
+    while (diff >= 2.0) { padded += '　'; diff -= 2.0; }
+    if (diff >= 1.0) { padded += ' '; diff -= 1.0; }
+    // 端数処理(0.5なら意図的に32ptを超えるようスペース追加)
+    if (diff > 0) { padded += ' '; }
+    
+    return padded;
+}
+
+function copySummaryText() {
+    const isAll = document.getElementById('copy-all-flag').checked;
+    const items = userState.selectedIds.filter(id => userState.timers[id]).map(id => {
+        const t = userState.timers[id] + DUR; 
+        const s = ALL_STATIONS.find(x => x.id === id);
+        return { name: `${s.typeName}Lv${s.lv}`, x: s.x, y: s.y, diff: t - Date.now(), mode: userState.modes[id] };
+    }).sort((a,b) => a.diff - b.diff);
+
+    const filtered = isAll ? items : items.filter(i => i.diff > 0 && i.diff <= 24 * 60 * 60 * 1000);
+    if (!filtered.length) { alert("対象がありません"); return; }
+
+    let result = "【状況報告】\n";
+    filtered.forEach(i => {
+        const h = Math.floor(Math.max(0, i.diff) / 3600000);
+        const m = Math.floor((Math.max(0, i.diff) % 3600000) / 60000);
+        const status = i.mode === 'enemy' ? '●' : '○';
+        const line = `${status}|${i.name}|${i.x},${i.y}|${h}h${m}m`;
+        result += formatLine(line) + "\n";
+    });
+    
+    navigator.clipboard.writeText(result).then(() => alert("チャット用レイアウトでコピーしました"));
+}
+
+// --- 描画・操作系 ---
 function render() {
     const grid = document.getElementById('station-list'); grid.innerHTML = '';
-    
-    // 表示用の配列を作成してソート
+    const now = Date.now();
     const sortedIds = [...userState.selectedIds].sort((a, b) => {
-        const timeA = userState.timers[a] ? userState.timers[a] + DUR : Infinity;
-        const timeB = userState.timers[b] ? userState.timers[b] + DUR : Infinity;
-        return timeA - timeB; // 時間が近い順。タイマーなしは最後。
+        const tA = userState.timers[a] ? userState.timers[a] + DUR : null;
+        const tB = userState.timers[b] ? userState.timers[b] + DUR : null;
+        if (tA === null && tB === null) return 0;
+        if (tA === null) return 1;
+        if (tB === null) return -1;
+        const diffA = tA - now;
+        const diffB = tB - now;
+        if (diffA <= 0 && diffB > 0) return -1;
+        if (diffA > 0 && diffB <= 0) return 1;
+        return tA - tB;
     });
 
     sortedIds.forEach(id => {
@@ -167,20 +208,6 @@ function render() {
         `;
         grid.appendChild(card);
     });
-}
-
-// --- タイマー・モード制御 ---
-function setMode(id, m) { userState.modes[id] = m; save(); render(); }
-function startTimer(id) { userState.timers[id] = Date.now(); save(); render(); }
-function resetTimer(id) { if(confirm('解除しますか？')) { delete userState.timers[id]; save(); render(); } }
-function sync(id) {
-    const v = prompt("残り時間 (1d 09:11:27)"); if(!v) return;
-    let s=0; const d=v.match(/(\d+)d/i); if(d) s+=d[1]*86400;
-    const pts=v.replace(/\d+d/i,'').replace(/[:：\s]/g,' ').trim().split(/\s+/);
-    if(pts.length===3) s+=pts[0]*3600+pts[1]*60+pts[2]*1;
-    else if(pts.length===2) s+=pts[0]*3600+pts[1]*60;
-    else if(pts[0]!=="") s+=pts[0]*3600;
-    userState.timers[id]=Date.now()+(s*1000)-DUR; save(); render();
 }
 
 function tick() {
@@ -214,7 +241,18 @@ function tick() {
     }).join('');
 }
 
-// --- ユーティリティ ---
+function setMode(id, m) { userState.modes[id] = m; save(); render(); }
+function startTimer(id) { userState.timers[id] = Date.now(); save(); render(); }
+function resetTimer(id) { if(confirm('解除しますか？')) { delete userState.timers[id]; save(); render(); } }
+function sync(id) {
+    const v = prompt("残り時間 (1d 09:11:27)"); if(!v) return;
+    let s=0; const d=v.match(/(\d+)d/i); if(d) s+=d[1]*86400;
+    const pts=v.replace(/\d+d/i,'').replace(/[:：\s]/g,' ').trim().split(/\s+/);
+    if(pts.length===3) s+=pts[0]*3600+pts[1]*60+pts[2]*1;
+    else if(pts.length===2) s+=pts[0]*3600+pts[1]*60;
+    else if(pts[0]!=="") s+=pts[0]*3600;
+    userState.timers[id]=Date.now()+(s*1000)-DUR; save(); render();
+}
 function showModal() { document.getElementById('modal').style.display = 'block'; filterModal(); }
 function hideModal() { document.getElementById('modal').style.display = 'none'; }
 function onTypeChange() {
@@ -241,26 +279,6 @@ function filterModal() {
 }
 function addStation(id) { userState.selectedIds.push(id); userState.modes[id] = 'none'; save(); render(); filterModal(); }
 function removeStation(id) { if(confirm('解除しますか？')) { userState.selectedIds = userState.selectedIds.filter(x => x !== id); delete userState.timers[id]; delete userState.modes[id]; save(); render(); } }
-
-function copySummaryText() {
-    const isAll = document.getElementById('copy-all-flag').checked;
-    let txt = isAll ? "【ステーション全状況】\n" : "【24h以内 保護終了】\n";
-    const items = userState.selectedIds.filter(id => userState.timers[id]).map(id => {
-        const t = userState.timers[id] + DUR; const s = ALL_STATIONS.find(x => x.id === id);
-        const date = new Date(t); const days = ['日','月','火','水','木','金','土'];
-        const jst = `${date.getMonth()+1}/${date.getDate()}(${days[date.getDay()]}) ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}:${date.getSeconds().toString().padStart(2,'0')}`;
-        return { name: `${s.typeName} Lv.${s.lv}`, diff: t - Date.now(), mode: userState.modes[id], jst: jst };
-    }).sort((a,b) => a.diff - b.diff);
-    const filtered = isAll ? items : items.filter(i => i.diff > 0 && i.diff <= 24 * 60 * 60 * 1000);
-    if (!filtered.length) { alert("対象がありません"); return; }
-    filtered.forEach(i => {
-        const h = Math.floor(Math.max(0,i.diff)/3600000);
-        const m = Math.floor((Math.max(0,i.diff)%3600000)/60000);
-        txt += `${i.mode==='enemy'?'●敵':'○自'} ${i.name}: ${i.jst}\n　(残 ${h}h${m}m)\n`;
-    });
-    navigator.clipboard.writeText(txt).then(() => alert("コピーしました"));
-}
-
 function shareURL() {
     if (!userState.selectedIds.length) return;
     const parts = userState.selectedIds.map(id => {
@@ -272,7 +290,6 @@ function shareURL() {
     const url = window.location.origin + window.location.pathname + "?v=" + parts.join('_');
     navigator.clipboard.writeText(url).then(() => alert("短縮URLをコピーしました"));
 }
-
 function exportData() { const b = new Blob([JSON.stringify(userState)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `wos_backup.json`; a.click(); }
 function importData(e) { const r = new FileReader(); r.onload = (ev) => { try { userState = JSON.parse(ev.target.result); save(); render(); } catch(e){alert("失敗");} }; r.readAsText(e.target.files[0]); }
 window.onload = () => { load(); setInterval(tick, 1000); };
