@@ -2,23 +2,18 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>工程ステーション管理</title>
+    <title>ステーション保守管理</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="controls">
-    <div class="version-info">
-        HTML: v3.3.0 | JS: <span id="js-version-tag">--</span>
-    </div>
+    <div class="version-info">HTML: v3.4.0 | JS: <span id="js-version-tag">--</span></div>
     <button class="btn" onclick="showModal()">＋ 追加</button>
-    <button class="btn" onclick="shareURL()">🔗 リンク生成</button>
-    <button class="btn" onclick="exportData()">💾 保存</button>
-    <input type="file" id="import-file" style="display:none" onchange="importData(event)">
-    <button class="btn" onclick="document.getElementById('import-file').click()">📂 読込</button>
+    <button class="btn" onclick="shareURL()">🔗 共有リンク生成</button>
 </div>
 <div id="station-list" class="station-grid"></div>
 
-<div id="modal">
+<div id="modal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
             <select id="f-type" onchange="updateLvFilters()"><option value="">全種別</option></select>
