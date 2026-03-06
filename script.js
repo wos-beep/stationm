@@ -1,4 +1,4 @@
-const APP_VERSION = "3.5.7", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.5.8", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -30,15 +30,17 @@ async function init() {
     const urlParams = new URLSearchParams(window.location.search);
     const d = urlParams.get('d');
     if(d) {
-        try {
-            const data = JSON.parse(atob(d.replace(/-/g, '+').replace(/_/g, '/')));
-            userState.selectedIds = []; userState.timers = {}; userState.modes = {};
-            data.forEach(([idx, timeSec]) => {
-                const s = ALL_STATIONS[idx];
-                if(s) { userState.selectedIds.push(s.id); userState.timers[s.id] = timeSec * 1000; userState.modes[s.id] = 'self'; }
-            });
-            save();
-        } catch(e) { console.error("URL data corrupted"); }
+        userState.selectedIds = []; userState.timers = {}; userState.modes = {};
+        d.split("-").forEach(item => {
+            const [idx, timeSec] = item.split(".");
+            const s = ALL_STATIONS[idx];
+            if(s) { 
+                userState.selectedIds.push(s.id); 
+                userState.timers[s.id] = parseInt(timeSec) * 1000;
+                userState.modes[s.id] = 'self'; 
+            }
+        });
+        save();
     } else {
         const saved = localStorage.getItem(STORAGE_KEY);
         if(saved) userState = JSON.parse(saved);
@@ -77,9 +79,10 @@ function copySummaryText() {
 }
 
 function shareURL() {
-    const compact = userState.selectedIds.map(id => [ALL_STATIONS.findIndex(s => s.id === id), Math.floor(userState.timers[id] / 1000)]);
-    const d = btoa(JSON.stringify(compact)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-    const url = window.location.origin + window.location.pathname + "?d=" + d;
+    const data = userState.selectedIds.map(id => 
+        ALL_STATIONS.findIndex(s => s.id === id) + "." + Math.floor(userState.timers[id] / 1000)
+    ).join("-");
+    const url = window.location.origin + window.location.pathname + "?d=" + data;
     navigator.clipboard.writeText(url).then(() => alert("URLをコピーしました (" + url.length + "文字)"));
 }
 
