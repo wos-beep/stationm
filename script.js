@@ -1,4 +1,4 @@
-const APP_VERSION = "3.5.8", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.5.9", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -68,6 +68,21 @@ function render(sortedIds) {
             const dateStr = isExpired ? "争奪中" : new Date(Date.now() + diff).toLocaleString('ja-JP', {month:'numeric', day:'numeric', weekday:'short', hour:'2-digit', minute:'2-digit'});
             summaryList.innerHTML += `<div class="summary-entry">[${m==='self'?'自':'他'}] ${s.typeName}Lv.${s.lv}: ${dateStr}</div>`;
         }
+    });
+    renderChart();
+}
+
+function renderChart() {
+    const chart = document.getElementById('gantt-chart');
+    if(!chart) return;
+    chart.innerHTML = '<div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:2px; font-size:10px;">' + Array.from({length:7}, (_,i) => `<div>${i+1}日後</div>`).join('') + '</div>';
+    userState.selectedIds.forEach(id => {
+        const s = ALL_STATIONS.find(x => x.id === id);
+        const start = userState.timers[id] || Date.now();
+        const end = start + DUR;
+        const left = Math.max(0, (start - Date.now()) / (7 * 86400000) * 100);
+        const width = Math.min(100 - left, DUR / (7 * 86400000) * 100);
+        chart.innerHTML += `<div style="height:10px; background:${userState.modes[id]==='self'?'#4a9':'#f96'}; margin:2px 0; border-radius:2px; margin-left:${left}%; width:${width}%" title="${s.typeName}Lv.${s.lv}"></div>`;
     });
 }
 
