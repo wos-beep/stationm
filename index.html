@@ -2,26 +2,17 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>施設管理システム [v2.6.2 完全再現]</title>
+    <title>工程ステーション管理</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="controls">
         <button onclick="showModal()">＋ 追加</button>
-        <button onclick="exportData()">保存(JSON)</button>
-        <button onclick="document.getElementById('import-file').click()">読込</button>
+        <button onclick="exportData()">💾 保存</button>
+        <button onclick="document.getElementById('import-file').click()">📂 読込</button>
         <input type="file" id="import-file" style="display:none" onchange="importData(event)">
     </div>
-    
-    <div id="station-list" class="station-grid"></div>
-    
-    <div id="protection-list" class="protection-area">
-        <h3>保護終了まで24時間以内</h3>
-        <button onclick="copyProtectionList()">📋 全てコピー</button>
-        <div id="protection-items"></div>
-    </div>
-
-    <div id="modal" class="modal-overlay"><div class="modal-content"><button onclick="hideModal()">閉じる</button><div id="modal-list"></div></div></div>
+    <div id="station-list"></div>
     <script src="script.js"></script>
 </body>
 </html>
