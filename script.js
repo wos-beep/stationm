@@ -1,12 +1,17 @@
+const APP_VERSION = "3.0.0"; // v3.0.0: モジュール化および機能改修版
+
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 const STORAGE_KEY = 'wos_v300_master', DUR = 72 * 3600000, EPOCH = 1735689600;
 
 async function init() {
+    console.log(`System Initialized: v${APP_VERSION}`);
     const res = await fetch('station.json');
     MASTER_DATA = await res.json();
     Object.entries(MASTER_DATA).forEach(([k, cat]) => {
         cat.coords.forEach((c, i) => ALL_STATIONS.push({ id:`${k}-${c.lv}-${i}`, typeKey:k, typeName:cat.name, lv:c.lv, x:c.x, y:c.y }));
     });
+    
+    // データ移行ロジック
     const saved = localStorage.getItem('wos_v255_master') || localStorage.getItem(STORAGE_KEY);
     if(saved) {
         userState = JSON.parse(saved);
@@ -15,16 +20,19 @@ async function init() {
             if(userState.modes[id] === 'enemy') userState.modes[id] = 'other';
         });
     }
-    render(); setInterval(tick, 1000);
+    render(); 
+    setInterval(tick, 1000);
 }
 
 function sync(id) {
     const val = prompt("残り時間を入力 (例: 1d 09:11:27)");
     if(!val) return;
     let sec = 0;
-    const d = val.match(/(\d+)d/i); if(d) sec += d[1]*86400;
+    const d = val.match(/(\d+)d/i); if(d) sec += parseInt(d[1])*86400;
     const t = val.replace(/\d+d/i,'').trim().split(/[:：]/);
-    if(t.length===3) sec += t[0]*3600 + t[1]*60 + t[2]*1;
+    if(t.length===3) sec += parseInt(t[0])*3600 + parseInt(t[1])*60 + parseInt(t[2]);
+    else if(t.length===2) sec += parseInt(t[0])*3600 + parseInt(t[1])*60;
+    
     userState.timers[id] = Date.now() + (sec*1000) - DUR;
     save(); render();
 }
@@ -34,15 +42,23 @@ function tick() {
         const el = document.getElementById(`t-${id}`), jstEl = document.getElementById(`jst-${id}`);
         if(!el) return;
         const diff = (userState.timers[id] || 0) + DUR - Date.now();
-        if(diff <= 0) { el.innerText = "争奪中"; el.className = "countdown cd-danger"; }
-        else {
-            const d = Math.floor(diff/86400000), h = Math.floor((diff%86400000)/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
+        
+        if(diff <= 0) {
+            el.innerText = "争奪中";
+            el.className = "countdown cd-danger";
+        } else {
+            const d = Math.floor(diff/86400000);
+            const h = Math.floor((diff%86400000)/3600000);
+            const m = Math.floor((diff%3600000)/60000);
+            const s = Math.floor((diff%60000)/1000);
             el.innerText = `${d}d ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
             el.className = "countdown " + (diff <= 3600000 ? "cd-warning" : "cd-safe");
         }
+        
         if(jstEl) {
             const date = new Date((userState.timers[id] || 0) + DUR);
-            jstEl.innerText = `${date.getMonth()+1}/${date.getDate()}(${['日','月','火','水','木','金','土'][date.getDay()]}) ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+            const dayStr = ['日','月','火','水','木','金','土'][date.getDay()];
+            jstEl.innerText = `${date.getMonth()+1}/${date.getDate()}(${dayStr}) ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
         }
     });
 }
@@ -64,4 +80,5 @@ function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); 
 function removeStation(id) { userState.selectedIds = userState.selectedIds.filter(x=>x!==id); save(); render(); }
 function showModal() { document.getElementById('modal').style.display = 'block'; }
 function hideModal() { document.getElementById('modal').style.display = 'none'; }
+
 init();
