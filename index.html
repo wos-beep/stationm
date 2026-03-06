@@ -3,120 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>[v2.8.1] ステーション管理</title>
+    <title>[v2.8.3] 施設管理</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --accent: #ff5252; --own: #448AFF; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; padding-bottom: 250px; }
-        
-        /* スマホ対応の大きなUI */
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; position: sticky; top: 0; z-index: 100; background: #121212; padding: 10px 0; }
         .btn { cursor: pointer; padding: 20px; border: none; border-radius: 12px; background: #444; color: white; font-weight: bold; font-size: 1.1rem; }
-        .btn:active { background: #666; }
-        
         .gantt-container { background: #1a1a1a; padding: 10px; border-radius: 12px; margin-bottom: 20px; overflow-x: auto; }
-        .gantt-canvas { height: 250px; width: 1680px; position: relative; border-left: 2px solid #555; }
-        
-        .station-grid { display: grid; gap: 15px; }
-        .station-card { background: var(--card); padding: 20px; border-radius: 16px; border-left: 10px solid #555; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .gantt-canvas { height: 150px; width: 1680px; position: relative; border-left: 2px solid #555; }
+        .station-card { background: #1e1e1e; padding: 20px; border-radius: 16px; border-left: 10px solid #555; margin-bottom: 15px; }
         .station-card.own { border-color: var(--own); }
         .station-card.enemy { border-color: var(--accent); }
-        
-        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 999; }
-        .modal-content { padding: 20px; }
-        select, input { width: 100%; padding: 20px; font-size: 1.2rem; border-radius: 12px; background: #222; color: #fff; border: 1px solid #555; margin-bottom: 15px; }
+        .popup { position: fixed; background: #333; padding: 15px; border-radius: 8px; border: 1px solid #777; z-index: 1000; display: none; font-size: 1rem; pointer-events: none; }
     </style>
 </head>
 <body>
 
-<div class="controls">
-    <button class="btn" style="background:#2e7d32;" onclick="showModal()">＋ 施設追加</button>
-    <button class="btn" onclick="shareURL()">🔗 共有リンク発行</button>
+<div class="controls" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
+    <button class="btn" style="background:#2e7d32;" onclick="showModal()">＋ 追加</button>
+    <button class="btn" onclick="shareURL()">🔗 共有</button>
 </div>
 
 <div class="gantt-container">
     <div id="gantt-body" class="gantt-canvas"></div>
 </div>
 
-<div id="station-list" class="station-grid"></div>
-
-<div id="modal">
-    <div class="modal-content">
-        <button class="btn" style="width:100%; background:#666;" onclick="hideModal()">閉じる</button>
-        <select id="f-type" onchange="filterModal()"><option value="">種別を選択...</option></select>
-        <div id="modal-list"></div>
-    </div>
-</div>
+<div id="station-list"></div>
+<div id="popup" class="popup"></div>
 
 <script>
-const MASTER_DATA = { "construction": { "name": "建築", "coords": [{x:1068,y:138,lv:1},{x:486,y:327,lv:3}] }, "defense": { "name": "防御", "coords": [{x:666,y:138,lv:2},{x:816,y:717,lv:4}] } };
-const ALL_STATIONS = []; Object.entries(MASTER_DATA).forEach(([k, cat]) => { cat.coords.forEach((c, i) => ALL_STATIONS.push({ id:`${k}-${c.lv}-${i}`, typeKey:k, typeName:cat.name, lv:c.lv, x:c.x, y:c.y })); });
-
-let userState = { selectedIds: [], timers: {}, modes: {} };
-const STORAGE_KEY = 'wos_v281_master';
 const DUR_PROTECT = 72 * 3600000;
 const DUR_TOTAL = 96 * 3600000;
+const MASTER_DATA = { "construction": { "name": "建築", "coords": [{x:1068,y:138,lv:1}] }, "defense": { "name": "防御", "coords": [{x:666,y:138,lv:2}] } };
+const ALL_STATIONS = []; Object.entries(MASTER_DATA).forEach(([k, cat]) => { cat.coords.forEach((c, i) => ALL_STATIONS.push({ id:`${k}-${c.lv}-${i}`, typeKey:k, typeName:cat.name, lv:c.lv, x:c.x, y:c.y })); });
+let userState = { selectedIds: [], timers: {}, modes: {} };
 
-function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
-
-function shareURL() {
-    if (!userState.selectedIds.length) return alert("施設がありません");
-    const parts = userState.selectedIds.map(id => {
-        const idx = ALL_STATIONS.findIndex(s => s.id === id);
-        const mode = userState.modes[id] === 'own' ? 1 : (userState.modes[id] === 'enemy' ? 2 : 0);
-        const time = userState.timers[id] ? Math.floor(userState.timers[id]/1000 - 1735689600).toString(36) : "";
-        return `${idx.toString(36)}.${mode}.${time}`;
-    });
-    const url = window.location.origin + window.location.pathname + "?v=" + parts.join('_');
-    navigator.clipboard.writeText(url).then(() => alert("リンクをコピーしました！"));
-}
-
-function removeStation(id) {
-    if (confirm('この施設をリストから削除してもよろしいですか？')) {
-        userState.selectedIds = userState.selectedIds.filter(x => x !== id);
-        delete userState.timers[id]; delete userState.modes[id];
-        save(); render();
-    }
+function formatTime(ms) {
+    if (ms <= 0) return "争奪中";
+    const d = Math.floor(ms / (24 * 3600000));
+    const h = Math.floor((ms % (24 * 3600000)) / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    return `${d}d ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function render() {
-    const grid = document.getElementById('station-list'); grid.innerHTML = '';
-    userState.selectedIds.forEach(id => {
+    const list = document.getElementById('station-list'); list.innerHTML = '';
+    const body = document.getElementById('gantt-body'); body.innerHTML = '';
+    const now = Date.now();
+    
+    userState.selectedIds.forEach((id, idx) => {
         const s = ALL_STATIONS.find(x => x.id === id);
-        const mode = userState.modes[id], t = userState.timers[id];
-        const card = document.createElement('div'); card.className = `station-card ${mode}`;
+        const t = userState.timers[id];
+        const card = document.createElement('div'); card.className = `station-card ${userState.modes[id] || ''}`;
+        const endTime = t ? new Date(t + DUR_PROTECT) : null;
+        
         card.innerHTML = `
-            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                <div style="font-size:1.2rem; font-weight:bold;">${s.typeName} Lv.${s.lv}</div>
-                <button class="btn" style="padding:5px 15px;" onclick="removeStation('${id}')">削除</button>
-            </div>
-            <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <button class="btn" style="flex:1; background:${mode==='own'?'var(--own)':'#333'}" onclick="setMode('${id}','own')">自軍</button>
-                <button class="btn" style="flex:1; background:${mode==='enemy'?'var(--accent)':'#333'}" onclick="setMode('${id}','enemy')">敵軍</button>
-            </div>
-            ${t ? `<div style="font-size:2rem; font-weight:bold; font-family:monospace;" id="t-${id}">--:--:--</div>` : `<button class="btn" style="width:100%; background:#2e7d32;" onclick="startTimer('${id}')">保護開始</button>`}
+            <div style="font-size:1.2rem; font-weight:bold;">${s.typeName} Lv.${s.lv}</div>
+            <div style="font-size:0.9rem; color:#aaa;">終了: ${endTime ? endTime.toLocaleString() : '--'}</div>
+            <div id="t-${id}" style="font-size:1.6rem; font-weight:bold; margin:10px 0;">--:--:--</div>
+            <button class="btn" style="width:100%; padding:10px;" onclick="removeStation('${id}')">削除</button>
         `;
-        grid.appendChild(card);
+        list.appendChild(card);
+        
+        if (t) {
+            const left = ((t % DUR_TOTAL) / DUR_TOTAL) * 1680;
+            const bar = document.createElement('div');
+            bar.style = `position:absolute; top:${idx * 40}px; left:${left}px; width:1200px; height:30px; background:${userState.modes[id] === 'enemy' ? '#ff5252' : '#448AFF'}; border-radius:4px;`;
+            bar.onclick = (e) => showPopup(e, `終了: ${endTime.toLocaleTimeString()}\n争奪開始: ${new Date(t + DUR_PROTECT).toLocaleTimeString()}`);
+            body.appendChild(bar);
+        }
     });
 }
 
-function setMode(id, m) { userState.modes[id] = m; save(); render(); }
-function startTimer(id) { userState.timers[id] = Date.now(); save(); render(); }
+function showPopup(e, text) {
+    const p = document.getElementById('popup');
+    p.innerText = text; p.style.display = 'block';
+    p.style.left = (e.pageX + 10) + 'px'; p.style.top = (e.pageY + 10) + 'px';
+    setTimeout(() => p.style.display = 'none', 3000);
+}
+
+function removeStation(id) {
+    if (confirm('この施設をリストから削除しますか？')) {
+        userState.selectedIds = userState.selectedIds.filter(x => x !== id);
+        render();
+    }
+}
+
+function shareURL() {
+    const parts = userState.selectedIds.map(id => {
+        const idx = ALL_STATIONS.findIndex(s => s.id === id);
+        return `${idx.toString(36)}.${userState.modes[id] === 'own' ? 1 : 2}`;
+    });
+    navigator.clipboard.writeText(window.location.origin + "?v=" + parts.join('_'));
+    alert("リンクをコピーしました");
+}
+
 function showModal() { document.getElementById('modal').style.display = 'block'; }
 function hideModal() { document.getElementById('modal').style.display = 'none'; }
-function filterModal() {
-    const type = document.getElementById('f-type').value, list = document.getElementById('modal-list'); list.innerHTML = '';
-    ALL_STATIONS.filter(s => !type || s.typeKey === type).forEach(s => {
-        list.innerHTML += `<div style="padding:15px; border-bottom:1px solid #444;" onclick="addStation('${s.id}')">${s.typeName} Lv.${s.lv} (${s.x},${s.y})</div>`;
-    });
-}
-function addStation(id) { userState.selectedIds.push(id); save(); render(); hideModal(); }
+function addStation(id) { userState.selectedIds.push(id); render(); hideModal(); }
 
-window.onload = () => { 
-    const saved = localStorage.getItem(STORAGE_KEY); if(saved) userState = JSON.parse(saved);
-    const tSel = document.getElementById('f-type');
-    Object.keys(MASTER_DATA).forEach(k => tSel.innerHTML += `<option value="${k}">${MASTER_DATA[k].name}</option>`);
-    render(); 
-};
+window.onload = render;
+setInterval(() => {
+    userState.selectedIds.forEach(id => {
+        const el = document.getElementById(`t-${id}`);
+        if(el && userState.timers[id]) el.innerText = formatTime((userState.timers[id] + DUR_PROTECT) - Date.now());
+    });
+}, 1000);
 </script>
 </body>
 </html>
