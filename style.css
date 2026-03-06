@@ -1,9 +1,35 @@
-:root { --bg: #121212; --card: #1e1e1e; --txt: #e0e0e0; --accent: #bb86fc; --own: #448AFF; --enemy: #ff5252; }
+:root { 
+    --bg: #121212; 
+    --card: #1e1e1e; 
+    --txt: #e0e0e0; 
+    --own: #448AFF; 
+    --enemy: #ff5252; 
+    --accent: #bb86fc;
+}
+
 body { background: var(--bg); color: var(--txt); font-family: sans-serif; padding: 20px; }
+
+/* 施設カードのグリッド */
 .station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
-.station-card { background: var(--card); padding: 15px; border-radius: 8px; border-left: 8px solid #555; }
-.station-card.own { border-color: var(--own); }
-.station-card.enemy { border-color: var(--enemy); }
-.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); }
-.modal-content { background: #222; margin: 5% auto; padding: 20px; width: 80%; border-radius: 8px; }
-.btn { cursor: pointer; padding: 8px 12px; }
+.station-card { background: var(--card); padding: 15px; border-radius: 8px; border-top: 5px solid #555; }
+.station-card.own { border-top-color: var(--own); }
+.station-card.enemy { border-top-color: var(--enemy); }
+
+/* 下部コピーリスト用エリア (今回追加の重要部分) */
+.protection-area { 
+    margin-top: 40px; 
+    padding: 20px; 
+    border-top: 2px solid #444; 
+    background: #1a1a1a; 
+}
+.protection-header { display: flex; align-items: center; gap: 15px; margin-bottom: 10px; }
+.prot-item { 
+    display: flex; 
+    justify-content: space-between; 
+    padding: 8px; 
+    border-bottom: 1px solid #333; 
+    font-family: monospace; 
+}
+
+/* ボタン共通 */
+button { cursor: pointer; padding: 6px 12px; }
