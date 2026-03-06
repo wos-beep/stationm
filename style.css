@@ -11,9 +11,9 @@ body { font-family: sans-serif; background: var(--bg); color: #e0e0e0; padding: 
 .modal-content { background: #333; margin: 10% auto; padding: 20px; width: 90%; max-width: 400px; border-radius: 8px; }
 .modal-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #444; }
 
-/* ガントチャート用 */
-.gantt-container { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; height: 120px; position: relative; overflow: hidden; }
-.gantt-bar { height: 12px; border-radius: 4px; position: absolute; }
+/* ガントチャート */
+.gantt-container { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; height: 180px; position: relative; overflow: hidden; }
+.gantt-bar { height: 12px; border-radius: 4px; position: absolute; transition: width 0.3s; }
 .gantt-bar.self { background-color: var(--self); }
 .gantt-bar.other { background-color: var(--danger); }
-.gantt-grid { position: absolute; top: 30px; bottom: 10px; border-left: 1px solid #444; font-size: 10px; color: #666; }
+.gantt-grid { position: absolute; top: 35px; bottom: 10px; border-left: 1px solid #444; }
