@@ -1,5 +1,35 @@
-const APP_VERSION = "3.5.2", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.5.3", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
+
+// OS判定: Windows環境かどうかの確認
+function isWindows() {
+    return navigator.userAgent.includes("Windows");
+}
+
+// 文字幅の重み付け
+function getCharWeight(char) {
+    if (char === '|') return 0.5;
+    // 全角判定（Unicode範囲）
+    if (/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/.test(char)) return 2.0;
+    return 1.0;
+}
+
+function calculateRowWeight(str) {
+    return Array.from(str).reduce((acc, char) => acc + getCharWeight(char), 0);
+}
+
+function padSummaryLine(line) {
+    let currentWeight = calculateRowWeight(line);
+    let target = 32.0;
+    let diff = target - currentWeight;
+    
+    // 不足分を埋める
+    while (diff >= 2.0) { line += "　"; diff -= 2.0; }
+    if (diff >= 1.0) { line += " "; diff -= 1.0; }
+    // 端数処理: 0.5ptが残る場合は1つスペースを追加して32.5pt以上へ調整
+    if (diff > 0) { line += " "; }
+    return line;
+}
 
 async function init() {
     const versionEl = document.getElementById('js-version-tag');
@@ -45,7 +75,10 @@ function render(sortedIds) {
 }
 
 function copySummaryText() {
-    const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => el.innerText);
+    const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => {
+        const text = el.innerText;
+        return isWindows() ? padSummaryLine(text) : text;
+    });
     const txt = entries.join('\n');
     if (!txt) { alert("コピー対象がありません"); return; }
     navigator.clipboard.writeText(txt).then(() => alert("コピーしました")).catch(err => alert("コピー失敗"));
@@ -88,5 +121,4 @@ function renderModalList() {
 }
 function shareURL() { const d = btoa(JSON.stringify(userState)); navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?data=" + d).then(() => alert("URLをコピーしました")); }
 
-// DOMContentLoaded で実行を保証
 document.addEventListener('DOMContentLoaded', init);
