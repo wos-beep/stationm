@@ -48,9 +48,7 @@ function render(sortedIds) {
 
 function renderChart() {
     const chart = document.getElementById('gantt-chart');
-    const DAYS = 4;
-    const now = Date.now();
-    const durationMs = DAYS * 86400000;
+    const DAYS = 4, now = Date.now(), durationMs = DAYS * 86400000;
     let html = '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">';
     for(let i=0; i<=DAYS; i++) {
         const d = new Date(now + (i * 86400000));
@@ -59,10 +57,10 @@ function renderChart() {
     html += '</div>';
     for(let i=0; i<=DAYS; i++) html += `<div class="gantt-grid" style="left:${(i/DAYS)*100}%"></div>`;
     userState.selectedIds.forEach((id, index) => {
-        const start = userState.timers[id] || now, left = Math.max(0, (start - now) / durationMs * 100);
-        const width = Math.min(100 - left, DUR / durationMs * 100);
-        const expiry = new Date(start + DUR);
-        html += `<div class="gantt-bar ${userState.modes[id]}" title="${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:00まで" style="left:${left}%; width:${width}%; top:${45 + (index % 8) * 15}px"></div>`;
+        const s = ALL_STATIONS.find(x => x.id === id), startTime = userState.timers[id] || now, endTime = startTime + DUR;
+        const left = Math.max(0, (startTime - now) / durationMs * 100), right = Math.min(100, (endTime - now) / durationMs * 100);
+        const width = Math.max(0, right - left), expiry = new Date(endTime), label = `${s.typeName} Lv.${s.lv}`;
+        html += `<div class="gantt-bar ${userState.modes[id]}" title="${label}: ${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:00まで" style="left:${left}%; width:${width}%; top:${45 + (index % 8) * 15}px; font-size:9px; color:#fff; white-space:nowrap; padding-left:2px;">${label}</div>`;
     });
     chart.innerHTML = html;
 }
