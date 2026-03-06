@@ -3,71 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>[v2.8.8] 施設管理-完全版</title>
-    <style>
-        :root { --bg: #121212; --card: #1e1e1e; --accent: #ff5252; --own: #448AFF; }
-        body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; padding-bottom: 250px; }
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .btn { cursor: pointer; padding: 15px; border: none; border-radius: 8px; background: #444; color: white; font-weight: bold; }
-        .station-card { background: var(--card); padding: 15px; border-radius: 10px; border-left: 8px solid #555; margin-bottom: 10px; }
-        .station-card.own { border-color: var(--own); }
-        .station-card.enemy { border-color: var(--accent); }
-    </style>
+    <title>[v2.9.1] 施設管理-メイン</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<div class="controls">
-    <button class="btn" style="background:#2e7d32;" onclick="showModal()">＋ 追加</button>
-    <button class="btn" onclick="shareURL()">🔗 共有リンク</button>
-    <button class="btn" onclick="copySummaryText()">📋 報告コピー</button>
-    <button class="btn" onclick="exportData()">💾 保存</button>
-</div>
-
-<div id="station-list"></div>
-
-<div id="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999; padding:20px;">
-    <button class="btn" style="width:100%;" onclick="hideModal()">閉じる</button>
-    <select id="type-filter" onchange="filterModal()" style="width:100%; padding:15px; margin:10px 0;"></select>
-    <div id="modal-list" style="overflow-y:auto; height:70vh;"></div>
-</div>
-
-<script>
-const MASTER_DATA = { "construction": { "name": "建築", "coords": [{x:1068,y:138,lv:1},{x:537,y:138,lv:1}] }, "defense": { "name": "防御", "coords": [{x:666,y:138,lv:2},{x:438,y:267,lv:2}] } };
-const ALL_STATIONS = []; Object.entries(MASTER_DATA).forEach(([k, cat]) => { cat.coords.forEach((c, i) => ALL_STATIONS.push({ id:`${k}-${c.lv}-${i}`, typeKey:k, typeName:cat.name, lv:c.lv, x:c.x, y:c.y })); });
-let userState = { selectedIds: [], timers: {}, modes: {} };
-
-function render() {
-    const list = document.getElementById('station-list'); list.innerHTML = '';
-    userState.selectedIds.forEach(id => {
-        const s = ALL_STATIONS.find(x => x.id === id);
-        const mode = userState.modes[id] || 'none';
-        const card = document.createElement('div'); card.className = `station-card ${mode}`;
-        card.innerHTML = `
-            <div>${s.typeName} Lv.${s.lv} (${s.x},${s.y})</div>
-            <div style="margin:10px 0;">
-                <button class="btn" style="background:${mode=='own'?'var(--own)':'#333'}" onclick="setMode('${id}','own')">自</button>
-                <button class="btn" style="background:${mode=='enemy'?'var(--accent)':'#333'}" onclick="setMode('${id}','enemy')">敵</button>
-            </div>
-            ${userState.timers[id] ? `<div id="t-${id}">--:--:--</div>` : `<button class="btn" onclick="startTimer('${id}')">保護開始(72h)</button>`}
-            <button class="btn" onclick="removeStation('${id}')">削除</button>
-        `;
-        list.appendChild(card);
-    });
-}
-
-function setMode(id, m) { userState.modes[id] = m; render(); }
-function startTimer(id) { userState.timers[id] = Date.now(); render(); }
-function removeStation(id) { userState.selectedIds = userState.selectedIds.filter(x => x !== id); delete userState.timers[id]; delete userState.modes[id]; render(); }
-function copySummaryText() {
-    let text = "【状況報告】\n" + userState.selectedIds.filter(id => userState.timers[id]).map(id => {
-        const s = ALL_STATIONS.find(x => x.id === id);
-        return `${userState.modes[id] === 'enemy' ? '●敵' : '○自'} | ${s.typeName}Lv${s.lv} | ${s.x},${s.y}`;
-    }).join("\n");
-    navigator.clipboard.writeText(text); alert("コピーしました");
-}
-// 共有・保存等のロジックは前回同様
-// ... (適宜既存ロジックを統合)
-window.onload = () => { render(); };
-</script>
+    <div id="app-meta" style="display:none">Version: v2.9.1</div>
+    
+    <div id="station-list"></div>
+    
+    <script src="script.js"></script>
 </body>
 </html>
