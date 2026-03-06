@@ -2,39 +2,25 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>[v2.9.2] 施設管理-完全版</title>
+    <title>[v2.9.3] 施設管理-完全統合版</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="controls">
-        <div class="version-tag">v2.9.2</div>
-        <button class="btn btn-add" onclick="showModal()">＋ 追加</button>
-        <button class="btn" onclick="shareURL()">🔗 共有リンク</button>
-        <div class="data-group">
-            <button class="btn" style="background:#4527a0" onclick="exportData()">保存(JSON)</button>
-            <button class="btn" onclick="document.getElementById('import-file').click()">読込</button>
-            <input type="file" id="import-file" style="display:none" onchange="importData(event)">
-        </div>
+        <div class="version">v2.9.3</div>
+        <button class="btn" onclick="showModal()">＋ 追加</button>
+        <button class="btn" onclick="exportData()">💾 保存</button>
+        <button class="btn" onclick="document.getElementById('import-file').click()">📂 読込</button>
+        <input type="file" id="import-file" style="display:none" onchange="importData(event)">
     </div>
-
     <div id="station-list" class="station-grid"></div>
 
-    <div id="modal">
+    <div id="modal" class="modal-overlay">
         <div class="modal-content">
-            <div class="modal-header">
-                <h3>施設追加</h3>
-                <button class="btn" onclick="hideModal()">閉じる</button>
-            </div>
-            <div class="modal-filter">
-                <select id="f-type" onchange="onTypeChange()"><option value="">全施設</option></select>
-                <select id="f-lv" onchange="filterModal()"><option value="">全Lv</option></select>
-                <input type="text" id="f-search" placeholder="座標検索..." oninput="filterModal()">
-            </div>
+            <button onclick="hideModal()">閉じる</button>
             <div id="modal-list"></div>
         </div>
     </div>
-
     <script src="script.js"></script>
 </body>
 </html>
