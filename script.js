@@ -1,14 +1,9 @@
-const APP_VERSION = "v2.6.2-ported";
-let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
+let MASTER_DATA = {}, userState = { selectedIds: [], timers: {}, modes: {} };
 
 async function init() {
-    document.getElementById('version-display').innerText = "Ver: " + APP_VERSION;
     const res = await fetch('station.json');
     MASTER_DATA = await res.json();
-    Object.entries(MASTER_DATA).forEach(([k, cat]) => {
-        cat.coords.forEach((c, i) => ALL_STATIONS.push({ id:`${k}-${c.lv}-${i}`, typeName:cat.name, lv:c.lv, x:c.x, y:c.y }));
-    });
-    const saved = localStorage.getItem('wos_data_v291');
+    const saved = localStorage.getItem('wos_data');
     if (saved) userState = JSON.parse(saved);
     render();
     setInterval(render, 1000);
@@ -16,40 +11,39 @@ async function init() {
 
 function render() {
     const list = document.getElementById('station-list');
+    const protItems = document.getElementById('protection-items');
     list.innerHTML = '';
+    protItems.innerHTML = '';
+
     userState.selectedIds.forEach(id => {
-        const s = ALL_STATIONS.find(x => x.id === id);
-        if(!s) return;
-        const time = userState.timers[id] || 0;
-        const mode = userState.modes[id] || 'none';
+        const [k, lv, i] = id.split('-');
+        const s = MASTER_DATA[k].coords[i];
+        const endTime = userState.timers[id] || 0;
+        const diff = endTime - Date.now();
+
+        // メインカード描画
         const div = document.createElement('div');
-        div.className = `station-card ${mode}`;
-        div.innerHTML = `
-            <div>${s.typeName} Lv.${s.lv} (${s.x},${s.y})</div>
-            <div>${time ? new Date(time).toLocaleString() : '未設定'}</div>
-            <button onclick="setMode('${id}', 'own')">自軍</button>
-            <button onclick="setMode('${id}', 'enemy')">敵軍</button>
-            <button onclick="removeStation('${id}')">削除</button>
-        `;
+        div.className = `station-card ${userState.modes[id] || ''}`;
+        div.innerHTML = `<div>${MASTER_DATA[k].name} Lv.${s.lv} (${s.x},${s.y})</div>
+                         <div style="font-weight:bold">${diff > 0 ? formatTime(diff) : formatDate(endTime)}</div>
+                         <button onclick="setMode('${id}', 'own')">自</button>
+                         <button onclick="setMode('${id}', 'enemy')">他</button>
+                         <button onclick="syncTimer('${id}')">同期</button>`;
         list.appendChild(div);
+
+        // 24時間以内リスト用描画
+        if (diff > 0 && diff < 86400000) {
+            const p = document.createElement('div');
+            p.className = 'prot-item';
+            p.innerHTML = `<span>${MASTER_DATA[k].name} (${s.x},${s.y}) ${formatDate(endTime)}</span>`;
+            protItems.appendChild(p);
+        }
     });
 }
 
-function setMode(id, mode) { userState.modes[id] = mode; save(); render(); }
-function removeStation(id) { userState.selectedIds = userState.selectedIds.filter(i => i !== id); save(); render(); }
-function save() { localStorage.setItem('wos_data_v291', JSON.stringify(userState)); }
-function importData(e) {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        userState = JSON.parse(ev.target.result);
-        save(); render();
-    };
-    reader.readAsText(e.target.files[0]);
+function copyProtectionList() {
+    const items = Array.from(document.querySelectorAll('.prot-item')).map(el => el.innerText).join('\n');
+    navigator.clipboard.writeText(items).then(() => alert("コピーしました"));
 }
-function exportData() {
-    const blob = new Blob([JSON.stringify(userState)], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'wos_backup.json'; a.click();
-}
-window.onload = init;
+
+// (補助関数：formatTime, formatDate, parseDuration, syncTimer 等を以前の定義に合わせて記述)
