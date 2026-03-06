@@ -13,7 +13,7 @@ body { font-family: sans-serif; background: var(--bg); color: #e0e0e0; padding: 
 
 /* ガントチャート */
 .gantt-container { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; height: 180px; position: relative; overflow: hidden; }
-.gantt-bar { height: 12px; border-radius: 4px; position: absolute; transition: width 0.3s; }
+.gantt-bar { height: 12px; border-radius: 4px; position: absolute; transition: width 0.3s; display: flex; align-items: center; box-sizing: border-box; }
 .gantt-bar.self { background-color: var(--self); }
 .gantt-bar.other { background-color: var(--danger); }
 .gantt-grid { position: absolute; top: 35px; bottom: 10px; border-left: 1px solid #444; }
