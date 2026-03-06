@@ -1,9 +1,10 @@
-const APP_VERSION = "3.5.0", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.5.2", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 async function init() {
-    document.getElementById('js-version-tag').innerText = APP_VERSION;
-    // マイグレーション
+    const versionEl = document.getElementById('js-version-tag');
+    if(versionEl) versionEl.innerText = APP_VERSION;
+    
     const OLD_KEYS = ['wos_v300_master', 'wos_v340_data'];
     for(let k of OLD_KEYS) {
         const old = localStorage.getItem(k);
@@ -16,7 +17,7 @@ async function init() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if(saved) userState = JSON.parse(saved);
     const typeSel = document.getElementById('f-type');
-    Object.entries(MASTER_DATA).forEach(([k, v]) => typeSel.innerHTML += `<option value="${k}">${v.name}</option>`);
+    if(typeSel) Object.entries(MASTER_DATA).forEach(([k, v]) => typeSel.innerHTML += `<option value="${k}">${v.name}</option>`);
     render(); setInterval(tick, 1000);
 }
 
@@ -27,6 +28,7 @@ function tick() {
 
 function render(sortedIds) {
     const list = document.getElementById('station-list'), summaryList = document.getElementById('summary-list');
+    if(!list || !summaryList) return;
     list.innerHTML = ''; summaryList.innerHTML = '';
     (sortedIds || userState.selectedIds).forEach(id => {
         const s = ALL_STATIONS.find(x => x.id === id), m = userState.modes[id] || 'none';
@@ -37,9 +39,16 @@ function render(sortedIds) {
         list.innerHTML += `<div class="station-card ${m}"><div>${s.typeName} Lv.${s.lv} (${s.x},${s.y})</div><div style="font-size:1.4rem; margin:10px 0;">${timeStr}</div><div style="display:flex; gap:5px;"><button class="btn" onclick="sync('${id}')">同期</button><button class="btn" onclick="removeStation('${id}')">削除</button><button class="btn" onclick="setMode('${id}')">同盟:${m==='self'?'自':m==='other'?'他':'なし'}</button></div></div>`;
         if (isExpired || diff <= 24 * 3600000) {
             const dateStr = isExpired ? "争奪中" : new Date(Date.now() + diff).toLocaleString('ja-JP', {month:'numeric', day:'numeric', weekday:'short', hour:'2-digit', minute:'2-digit'});
-            summaryList.innerHTML += `<div>[${m==='self'?'自':'他'}] ${s.typeName}Lv.${s.lv}: ${dateStr}</div>`;
+            summaryList.innerHTML += `<div class="summary-entry">[${m==='self'?'自':'他'}] ${s.typeName}Lv.${s.lv}: ${dateStr}</div>`;
         }
     });
+}
+
+function copySummaryText() {
+    const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => el.innerText);
+    const txt = entries.join('\n');
+    if (!txt) { alert("コピー対象がありません"); return; }
+    navigator.clipboard.writeText(txt).then(() => alert("コピーしました")).catch(err => alert("コピー失敗"));
 }
 
 function sync(id) {
@@ -78,4 +87,6 @@ function renderModalList() {
     });
 }
 function shareURL() { const d = btoa(JSON.stringify(userState)); navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?data=" + d).then(() => alert("URLをコピーしました")); }
-init();
+
+// DOMContentLoaded で実行を保証
+document.addEventListener('DOMContentLoaded', init);
