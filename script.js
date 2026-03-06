@@ -79,7 +79,10 @@ function copySummaryText() {
         const text = el.innerText;
         return isWindows() ? padSummaryLine(text) : text;
     });
-    const txt = entries.join('\n');
+    
+    // Windowsの場合は改行なしで連結、それ以外は改行で連結
+    const txt = isWindows() ? entries.join('') : entries.join('\n');
+    
     if (!txt) { alert("コピー対象がありません"); return; }
     navigator.clipboard.writeText(txt).then(() => alert("コピーしました")).catch(err => alert("コピー失敗"));
 }
