@@ -7,8 +7,8 @@
 </head>
 <body>
 <div class="controls">
-    <div style="font-size:0.7rem; color:#666; width:100%;">
-        HTML: v3.2.0 | JS: <span id="js-version-tag">--</span>
+    <div class="version-info">
+        HTML: v3.3.0 | JS: <span id="js-version-tag">--</span>
     </div>
     <button class="btn" onclick="showModal()">＋ 追加</button>
     <button class="btn" onclick="shareURL()">🔗 リンク生成</button>
@@ -20,17 +20,17 @@
 
 <div id="modal">
     <div class="modal-content">
-        <div style="margin-bottom:10px;">
+        <div class="modal-header">
             <select id="f-type" onchange="updateLvFilters()"><option value="">全種別</option></select>
             <select id="f-lv" onchange="renderModalList()"><option value="">全Lv</option></select>
             <button class="btn" onclick="hideModal()">閉じる</button>
         </div>
-        <div id="modal-list" style="max-height:60vh; overflow-y:auto;"></div>
+        <div id="modal-list"></div>
     </div>
 </div>
 
 <div class="summary-panel">
-    <button class="btn" onclick="copySummaryText()">全サマリーコピー</button>
+    <button class="btn" onclick="copySummaryText()">コピー</button>
     <div id="summary-list"></div>
 </div>
 <script src="script.js"></script>
