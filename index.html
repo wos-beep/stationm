@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>[v2.8.3] 施設管理</title>
+    <title>[v2.8.4] 施設管理</title>
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --accent: #ff5252; --own: #448AFF; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; padding-bottom: 250px; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .data-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .btn { cursor: pointer; padding: 20px; border: none; border-radius: 12px; background: #444; color: white; font-weight: bold; font-size: 1.1rem; }
         .gantt-container { background: #1a1a1a; padding: 10px; border-radius: 12px; margin-bottom: 20px; overflow-x: auto; }
         .gantt-canvas { height: 150px; width: 1680px; position: relative; border-left: 2px solid #555; }
@@ -18,9 +20,15 @@
 </head>
 <body>
 
-<div class="controls" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
+<div class="controls">
     <button class="btn" style="background:#2e7d32;" onclick="showModal()">＋ 追加</button>
     <button class="btn" onclick="shareURL()">🔗 共有</button>
+</div>
+
+<div class="data-btns">
+    <button class="btn" style="background:#0277bd;" onclick="exportData()">💾 JSON保存</button>
+    <button class="btn" style="background:#6a1b9a;" onclick="document.getElementById('file-input').click()">📂 JSON読込</button>
+    <input type="file" id="file-input" style="display:none" onchange="importData(event)">
 </div>
 
 <div class="gantt-container">
@@ -30,9 +38,13 @@
 <div id="station-list"></div>
 <div id="popup" class="popup"></div>
 
+<div id="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999; padding:20px;">
+    <button class="btn" style="width:100%;" onclick="hideModal()">閉じる</button>
+    <div id="modal-list" style="margin-top:20px;"></div>
+</div>
+
 <script>
 const DUR_PROTECT = 72 * 3600000;
-const DUR_TOTAL = 96 * 3600000;
 const MASTER_DATA = { "construction": { "name": "建築", "coords": [{x:1068,y:138,lv:1}] }, "defense": { "name": "防御", "coords": [{x:666,y:138,lv:2}] } };
 const ALL_STATIONS = []; Object.entries(MASTER_DATA).forEach(([k, cat]) => { cat.coords.forEach((c, i) => ALL_STATIONS.push({ id:`${k}-${c.lv}-${i}`, typeKey:k, typeName:cat.name, lv:c.lv, x:c.x, y:c.y })); });
 let userState = { selectedIds: [], timers: {}, modes: {} };
@@ -49,37 +61,25 @@ function formatTime(ms) {
 function render() {
     const list = document.getElementById('station-list'); list.innerHTML = '';
     const body = document.getElementById('gantt-body'); body.innerHTML = '';
-    const now = Date.now();
     
     userState.selectedIds.forEach((id, idx) => {
         const s = ALL_STATIONS.find(x => x.id === id);
         const t = userState.timers[id];
         const card = document.createElement('div'); card.className = `station-card ${userState.modes[id] || ''}`;
-        const endTime = t ? new Date(t + DUR_PROTECT) : null;
-        
         card.innerHTML = `
             <div style="font-size:1.2rem; font-weight:bold;">${s.typeName} Lv.${s.lv}</div>
-            <div style="font-size:0.9rem; color:#aaa;">終了: ${endTime ? endTime.toLocaleString() : '--'}</div>
             <div id="t-${id}" style="font-size:1.6rem; font-weight:bold; margin:10px 0;">--:--:--</div>
             <button class="btn" style="width:100%; padding:10px;" onclick="removeStation('${id}')">削除</button>
         `;
         list.appendChild(card);
         
         if (t) {
-            const left = ((t % DUR_TOTAL) / DUR_TOTAL) * 1680;
             const bar = document.createElement('div');
-            bar.style = `position:absolute; top:${idx * 40}px; left:${left}px; width:1200px; height:30px; background:${userState.modes[id] === 'enemy' ? '#ff5252' : '#448AFF'}; border-radius:4px;`;
-            bar.onclick = (e) => showPopup(e, `終了: ${endTime.toLocaleTimeString()}\n争奪開始: ${new Date(t + DUR_PROTECT).toLocaleTimeString()}`);
+            bar.style = `position:absolute; top:${idx * 40}px; left:20px; width:200px; height:30px; background:${userState.modes[id] === 'enemy' ? '#ff5252' : '#448AFF'};`;
+            bar.onclick = (e) => showPopup(e, `終了: ${new Date(t + DUR_PROTECT).toLocaleTimeString()}`);
             body.appendChild(bar);
         }
     });
-}
-
-function showPopup(e, text) {
-    const p = document.getElementById('popup');
-    p.innerText = text; p.style.display = 'block';
-    p.style.left = (e.pageX + 10) + 'px'; p.style.top = (e.pageY + 10) + 'px';
-    setTimeout(() => p.style.display = 'none', 3000);
 }
 
 function removeStation(id) {
@@ -89,20 +89,37 @@ function removeStation(id) {
     }
 }
 
-function shareURL() {
-    const parts = userState.selectedIds.map(id => {
-        const idx = ALL_STATIONS.findIndex(s => s.id === id);
-        return `${idx.toString(36)}.${userState.modes[id] === 'own' ? 1 : 2}`;
-    });
-    navigator.clipboard.writeText(window.location.origin + "?v=" + parts.join('_'));
-    alert("リンクをコピーしました");
+function exportData() {
+    const data = JSON.stringify(userState);
+    const blob = new Blob([data], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'wos_data.json'; a.click();
+}
+
+function importData(e) {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = (ev) => { userState = JSON.parse(ev.target.result); render(); };
+    reader.readAsText(file);
+}
+
+function showPopup(e, text) {
+    const p = document.getElementById('popup');
+    p.innerText = text; p.style.display = 'block';
+    p.style.left = (e.pageX + 10) + 'px'; p.style.top = (e.pageY + 10) + 'px';
+    setTimeout(() => p.style.display = 'none', 3000);
 }
 
 function showModal() { document.getElementById('modal').style.display = 'block'; }
 function hideModal() { document.getElementById('modal').style.display = 'none'; }
 function addStation(id) { userState.selectedIds.push(id); render(); hideModal(); }
 
-window.onload = render;
+window.onload = () => {
+    const list = document.getElementById('modal-list');
+    ALL_STATIONS.forEach(s => list.innerHTML += `<div style="padding:20px; border-bottom:1px solid #444;" onclick="addStation('${s.id}')">${s.typeName} Lv.${s.lv}</div>`);
+    render();
+};
 setInterval(() => {
     userState.selectedIds.forEach(id => {
         const el = document.getElementById(`t-${id}`);
