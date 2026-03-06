@@ -1,4 +1,4 @@
-const APP_VERSION = "3.5.6", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.5.7", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -27,16 +27,15 @@ async function init() {
         cat.coords.forEach((c, i) => ALL_STATIONS.push({ id:`${k}-${c.lv}-${i}`, typeKey:k, typeName:cat.name, lv:c.lv, x:c.x, y:c.y }));
     });
     
-    // クエリパラメータから復元 (v3.5.6形式)
     const urlParams = new URLSearchParams(window.location.search);
     const d = urlParams.get('d');
     if(d) {
         try {
             const data = JSON.parse(atob(d.replace(/-/g, '+').replace(/_/g, '/')));
             userState.selectedIds = []; userState.timers = {}; userState.modes = {};
-            data.forEach(([idx, time]) => {
+            data.forEach(([idx, timeSec]) => {
                 const s = ALL_STATIONS[idx];
-                if(s) { userState.selectedIds.push(s.id); userState.timers[s.id] = time; userState.modes[s.id] = 'self'; }
+                if(s) { userState.selectedIds.push(s.id); userState.timers[s.id] = timeSec * 1000; userState.modes[s.id] = 'self'; }
             });
             save();
         } catch(e) { console.error("URL data corrupted"); }
@@ -78,10 +77,10 @@ function copySummaryText() {
 }
 
 function shareURL() {
-    const compact = userState.selectedIds.map(id => [ALL_STATIONS.findIndex(s => s.id === id), userState.timers[id]]);
+    const compact = userState.selectedIds.map(id => [ALL_STATIONS.findIndex(s => s.id === id), Math.floor(userState.timers[id] / 1000)]);
     const d = btoa(JSON.stringify(compact)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     const url = window.location.origin + window.location.pathname + "?d=" + d;
-    navigator.clipboard.writeText(url).then(() => alert("短縮URLをコピーしました (" + url.length + "文字)"));
+    navigator.clipboard.writeText(url).then(() => alert("URLをコピーしました (" + url.length + "文字)"));
 }
 
 function sync(id) { const val = prompt("残り時間を入力 (例: 1d 09 37 50)"); if(!val) return; let sec = 0, d = val.match(/(\d+)d/i); if(d) sec += parseInt(d[1])*86400; const n = val.replace(/\d+d/i,'').trim().split(/[:：\s]+/u).map(Number); if(n.length === 3) sec += n[0]*3600 + n[1]*60 + n[2]; else if(n.length === 4) sec += n[0]*86400 + n[1]*3600 + n[2]*60 + n[3]; else if(n.length === 2) sec += n[0]*3600 + n[1]*60; userState.timers[id] = Date.now() + (sec*1000) - DUR; save(); tick(); }
