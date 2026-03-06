@@ -2,10 +2,6 @@ const APP_VERSION = "3.5.9", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
-function getCharWeight(char) { return /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/.test(char) ? 2.0 : 1.0; }
-function calculateRowWeight(str) { return Array.from(str).reduce((acc, char) => acc + getCharWeight(char), 0); }
-function padSummaryLine(line) { let currentWeight = calculateRowWeight(line), target = 32.0, diff = target - currentWeight; while (diff >= 2.0) { line += "　"; diff -= 2.0; } if (diff >= 1.0) { line += " "; } return line; }
-
 async function init() {
     document.getElementById('js-version-tag').innerText = APP_VERSION;
     const res = await fetch('station.json'); MASTER_DATA = await res.json();
@@ -58,14 +54,14 @@ function renderChart() {
     for(let i=0; i<=DAYS; i++) html += `<div class="gantt-grid" style="left:${(i/DAYS)*100}%"></div>`;
     userState.selectedIds.forEach((id, index) => {
         const s = ALL_STATIONS.find(x => x.id === id), startTime = userState.timers[id] || now, endTime = startTime + DUR;
-        const left = Math.max(0, (startTime - now) / durationMs * 100), right = Math.min(100, (endTime - now) / durationMs * 100);
-        const width = Math.max(0, right - left), expiry = new Date(endTime), label = `${s.typeName} Lv.${s.lv}`;
-        html += `<div class="gantt-bar ${userState.modes[id]}" title="${label}: ${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:00まで" style="left:${left}%; width:${width}%; top:${45 + (index % 8) * 15}px; font-size:9px; color:#fff; white-space:nowrap; padding-left:2px;">${label}</div>`;
+        const left = (startTime - now) / durationMs * 100, right = (endTime - now) / durationMs * 100;
+        const width = right - left, expiry = new Date(endTime), label = `${s.typeName} Lv.${s.lv}`;
+        if(right > 0) html += `<div class="gantt-bar ${userState.modes[id]}" title="${label}: ${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:00まで" style="left:${Math.max(0, left)}%; width:${Math.min(100, width)}%; top:${45 + (index % 8) * 16}px;">${label}</div>`;
     });
     chart.innerHTML = html;
 }
 
-function copySummaryText() { const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => isWindows() ? padSummaryLine(el.innerText) : el.innerText); navigator.clipboard.writeText(isWindows() ? entries.join('') : entries.join('\n')).then(() => alert("コピーしました")); }
+function copySummaryText() { const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => el.innerText); navigator.clipboard.writeText(entries.join('\n')).then(() => alert("コピーしました")); }
 function shareURL() { const data = userState.selectedIds.map(id => ALL_STATIONS.findIndex(s => s.id === id) + "." + Math.floor(userState.timers[id] / 1000)).join("-"); const url = window.location.origin + window.location.pathname + "?d=" + data; navigator.clipboard.writeText(url).then(() => alert("URLをコピーしました")); }
 function sync(id) { const val = prompt("残り時間を入力 (例: 1d 09 37 50)"); if(!val) return; let sec = 0, d = val.match(/(\d+)d/i); if(d) sec += parseInt(d[1])*86400; const n = val.replace(/\d+d/i,'').trim().split(/[:：\s]+/u).map(Number); if(n.length === 3) sec += n[0]*3600 + n[1]*60 + n[2]; else if(n.length === 4) sec += n[0]*86400 + n[1]*3600 + n[2]*60 + n[3]; userState.timers[id] = Date.now() + (sec*1000) - DUR; save(); tick(); }
 function exportData() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(userState)], {type: 'application/json'})); a.download = 'station_data.json'; a.click(); }
