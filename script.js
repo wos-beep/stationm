@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.2", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.3", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -98,27 +98,28 @@ function renderChart() {
     }
     
     userState.selectedIds.forEach((id, index) => {
-        const s = ALL_STATIONS.find(x => x.id === id);
-        if(!s) return;
-        
-        // 【修正点】ステーションの終了時刻を取得
-        const endTime = userState.timers[id] || now;
-        const timeLeft = endTime - now;
-        
-        // 【修正点】現在から終了までの残り時間をバーの幅（width）とする
-        const width = (timeLeft / durationMs) * 100;
-        const left = 0; // 現在時刻からスタートなので left は常に 0
-        
-        const expiry = new Date(endTime);
-        const label = `${s.typeName} Lv.${s.lv}`;
-        
-        // 残り時間がある場合のみ表示
-        if(timeLeft > 0) {
-            html += `<div class="gantt-bar ${userState.modes[id]}" 
-                title="${label}: ${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:${expiry.getMinutes().toString().padStart(2,'0')}まで" 
-                style="left:${left}%; width:${Math.min(100, width)}%; top:${45 + (index % 8) * 16}px;">
-                ${label}</div>`;
-        }
+    const s = ALL_STATIONS.find(x => x.id === id);
+    if(!s) return;
+    
+    // 終了時刻そのもの
+    const endTime = userState.timers[id] || now;
+    
+    // 過去のデータでも表示したい場合、現在時刻より終了時刻が前なら 0 を開始位置にする
+    // 終了時刻から72時間（DUR）引いたものが開始時刻とみなす
+    const startTime = endTime - DUR;
+    
+    // 現在より未来の終了時刻なら、現在からの残り時間を幅とする
+    const timeLeft = endTime - now;
+    
+    // 計算ロジック
+    const left = Math.max(0, (startTime - now) / durationMs * 100);
+    const width = (timeLeft > 0 ? timeLeft : DUR) / durationMs * 100;
+    
+    // 表示（過去のタスクも幅を持たせて表示する）
+    html += `<div class="gantt-bar ${userState.modes[id]}" 
+        title="${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:00まで" 
+        style="left:${left}%; width:${Math.min(100 - left, width)}%; top:${45 + (index % 8) * 16}px;">
+        ${label}</div>`;
     });
     chart.innerHTML = html;
 }
