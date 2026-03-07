@@ -1,14 +1,21 @@
-const APP_VERSION = "3.5.9", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.5.10", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
 
-// 文字幅の重み計算：ドット・コロンを0.5に調整
+// 【追加分】既存コードに影響を与えないためのパディング補助関数
 function getCharWeight(char) {
+    // 記号類を0.5として扱う場合はここを調整
     if (char === '.' || char === '．' || char === ':' || char === '：') return 0.5;
     return /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/.test(char) ? 2.0 : 1.0;
 }
 function calculateRowWeight(str) { return Array.from(str).reduce((acc, char) => acc + getCharWeight(char), 0); }
+function padSummaryLine(line, targetWidth = 32.0) { 
+    let diff = targetWidth - calculateRowWeight(line); 
+    while (diff >= 2.0) { line += "　"; diff -= 2.0; }
+    if (diff >= 1.0) { line += " "; }
+    return line; 
+}
 
 // パディング適用：Windows環境でのみ使用
 function padSummaryLine(line) { 
@@ -79,14 +86,15 @@ function renderChart() {
     chart.innerHTML = html;
 }
 
-// 修正済みコピー関数
-function copySummaryText() {
-    const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => {
-        return isWindows() ? padSummaryLine(el.innerText) : el.innerText;
-    });
-    // Windowsならパディング済みのため改行なしで結合、それ以外は改行あり
-    const textToCopy = isWindows() ? entries.join('') : entries.join('\n');
-    navigator.clipboard.writeText(textToCopy).then(() => alert("コピーしました"));
+function copySummaryText() { 
+    const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => el.innerText); 
+    if (isWindows()) {
+        // Windowsならパディングして改行なしで結合
+        navigator.clipboard.writeText(entries.map(line => padSummaryLine(line, 32.0)).join('')).then(() => alert("コピーしました"));
+    } else {
+        // それ以外は元の通りの動作
+        navigator.clipboard.writeText(entries.join('\n')).then(() => alert("コピーしました"));
+    }
 }
 
 function shareURL() { const data = userState.selectedIds.map(id => ALL_STATIONS.findIndex(s => s.id === id) + "." + Math.floor(userState.timers[id] / 1000)).join("-"); const url = window.location.origin + window.location.pathname + "?d=" + data; navigator.clipboard.writeText(url).then(() => alert("URLをコピーしました")); }
