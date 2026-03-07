@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.10", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.11", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -81,15 +81,23 @@ function render(sortedIds) {
     renderChart(ids);
 }
 
-function renderChart(sortedIds) { // 引数を受け取る
+function renderChart(sortedIds) {
     const chart = document.getElementById('gantt-chart');
-    const ids = sortedIds || userState.selectedIds; // ソート済みのIDを使用
+    const ids = sortedIds || userState.selectedIds;
     const DAYS = 4;
     const now = Date.now();
     const durationMs = DAYS * 86400000;
     
+    // ヘッダーとグリッドの描画
     let html = '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">';
-    // ...ヘッダー生成はそのまま...
+    for(let i = 0; i <= DAYS; i++) {
+        const d = new Date(now + (i * 86400000));
+        html += `<span style="font-size:10px; color:#aaa; width:${100/DAYS}%">${d.getMonth()+1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})</span>`;
+    }
+    html += '</div>';
+    for(let i = 0; i <= DAYS; i++) {
+        html += `<div class="gantt-grid" style="left:${(i / DAYS) * 100}%"></div>`;
+    }
     
     ids.forEach((id, index) => {
         const s = ALL_STATIONS.find(x => x.id === id);
@@ -98,17 +106,21 @@ function renderChart(sortedIds) { // 引数を受け取る
         const startTime = userState.timers[id]; 
         const endTime = startTime + DUR; 
         
-        // 【重要】現在時刻から見て、過去のバーも表示するために条件を緩和
-        // 少なくとも「終了まで残り24時間」以内なら表示する
-        if (endTime > (now - 86400000)) { 
+        // 【修正点】現在から終了までの残り時間
+        const remaining = Math.max(0, endTime - now);
+        
+        // 描画すべき期間が「現在〜終了」まである場合のみ
+        if (endTime > now) {
+            // バーの開始位置（現在時刻より前なら0%）
             const leftPercent = Math.max(0, (startTime - now) / durationMs * 100);
-            const remaining = Math.max(0, endTime - now);
-            const widthPercent = (DUR / durationMs) * 100; // 長さを固定して表示
+            
+            // バーの長さ（残り時間に比例。最低でも 1% は確保して見えなくならないようにする）
+            const widthPercent = Math.max(1, (remaining / durationMs) * 100);
             
             html += `<div class="gantt-bar ${userState.modes[id]}" 
                 title="${s.typeName} Lv.${s.lv}"
                 style="left:${leftPercent}%; width:${widthPercent}%; top:${35 + (index % 8) * 16}px;">
-                ${s.typeName} Lv.${s.lv}</div>`;
+                ${s.typeName}</div>`;
         }
     });
     chart.innerHTML = html;
