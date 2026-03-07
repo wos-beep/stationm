@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.0", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.1", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -84,40 +84,38 @@ function renderChart() {
     const chart = document.getElementById('gantt-chart');
     const DAYS = 4;
     const now = Date.now();
-    // 基準を「現在時刻」にする
     const durationMs = DAYS * 86400000;
     
     let html = '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">';
-    // 1. 目盛りを「現在時刻」からスタートするように修正
     for(let i = 0; i <= DAYS; i++) {
         const d = new Date(now + (i * 86400000));
         html += `<span style="font-size:10px; color:#aaa; width:${100/DAYS}%">${d.getMonth()+1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})</span>`;
     }
     html += '</div>';
     
-    // 2. グリッドの描画を修正（現在時刻から固定幅で描画）
     for(let i = 0; i <= DAYS; i++) {
         html += `<div class="gantt-grid" style="left:${(i / DAYS) * 100}%"></div>`;
     }
     
-    // 3. バーの描画計算
     userState.selectedIds.forEach((id, index) => {
         const s = ALL_STATIONS.find(x => x.id === id);
         if(!s) return;
         
+        // 固有のタイマー値から終了時刻を計算
         const startTime = userState.timers[id] || now;
-        const endTime = startTime + DUR; // DURは72時間（定数）
+        const endTime = startTime; // タイマーそのものが終了時刻と想定
         
-        // 基準が now なので、left/width がシンプルになる
-        const left = (startTime - now) / durationMs * 100;
-        const width = DUR / durationMs * 100;
+        // 開始位置と、現在から終了までの残り時間（幅）を算出
+        const left = Math.max(0, (startTime - now) / durationMs * 100);
+        const width = (endTime - now) / durationMs * 100;
+        
         const expiry = new Date(endTime);
         const label = `${s.typeName} Lv.${s.lv}`;
         
-        if(left < 100 && (left + width) > 0) {
+        if(width > 0) {
             html += `<div class="gantt-bar ${userState.modes[id]}" 
-                title="${label}: ${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:00まで" 
-                style="left:${Math.max(0, left)}%; width:${Math.min(100 - left, width)}%; top:${45 + (index % 8) * 16}px;">
+                title="${label}: ${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:${expiry.getMinutes().toString().padStart(2,'0')}まで" 
+                style="left:${left}%; width:${Math.min(100 - left, width)}%; top:${45 + (index % 8) * 16}px;">
                 ${label}</div>`;
         }
     });
