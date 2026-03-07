@@ -87,27 +87,34 @@ function renderChart() {
 }
 
 function copySummaryText() {
+    // 1. 各行要素からテキストを取得
     const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => {
-        // 現在のテキスト例: "[自] 生産Lv.1: 3/8 12:56"
-        let text = el.innerText;
+        let text = el.innerText; // 元のテキスト: "[自] 生産Lv.1: 3/8 12:56"
 
-        // 1. [自]/[他] を 【自】/【他】 に変換
+        // 2. 曜日変換・記号置換処理
+        // [自]→【自】, [他]→【他】
         text = text.replace(/\[自\]/g, '【自】').replace(/\[他\]/g, '【他】');
-        
-        // 2. 「Lv.」を「Lv」に、「: 」を「:」に置換してスペースを詰める
+        // Lv.1→Lv1, : → :
         text = text.replace(/Lv\./g, 'Lv').replace(/: /g, ':');
         
-        // 3. 日付部分(3/8 12:56)を抽出して曜日を追加し、半角スペースを「_」に置換
-        // 例: "3/8 12:56" -> "3/8(日)_12:56"
+        // 3. 日付部分(3/8 12:56)を抽出して「3/8(日)_12:56」に変換
         const dateMatch = text.match(/(\d+\/\d+)\s(\d{2}:\d{2})/);
         if (dateMatch) {
-            const [fullDate, d, time] = dateMatch;
-            const [m, day] = d.split('/').map(Number);
-            const dateObj = new Date(new Date().getFullYear(), m - 1, day);
+            const [m, d] = dateMatch[1].split('/').map(Number);
+            const dateObj = new Date(new Date().getFullYear(), m - 1, d);
             const dow = '日月火水木金土'[dateObj.getDay()];
-            const formatted = `${d}(${dow})_${time}`;
-            text = text.replace(fullDate, formatted);
+            text = text.replace(dateMatch[0], `${dateMatch[1]}(${dow})_${dateMatch[2]}`);
         }
+
+        // 4. Windows環境ならパディングを適用 (ここが以前消えていた処理です)
+        return isWindows() ? padSummaryLine(text, 32.0) : text;
+    });
+
+    // 5. Windowsなら改行なし(join(''))、それ以外は改行あり(join('\n'))で結合
+    const textToCopy = isWindows() ? entries.join('') : entries.join('\n');
+    
+    navigator.clipboard.writeText(textToCopy).then(() => alert("コピーしました"));
+}
         
         return text;
     });
