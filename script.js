@@ -82,9 +82,6 @@ function render(sortedIds) {
 
 function renderChart() {
     const chart = document.getElementById('gantt-chart');
-    // 強制的に中身を書き換えてみる
-    chart.innerHTML = '<div style="background:red; color:white; padding:10px;">デバッグ表示：この赤い枠が見えますか？</div>';
-    const chart = document.getElementById('gantt-chart');
     const DAYS = 4;
     const now = Date.now();
     const durationMs = DAYS * 86400000;
@@ -101,28 +98,23 @@ function renderChart() {
     }
     
     userState.selectedIds.forEach((id, index) => {
-    const s = ALL_STATIONS.find(x => x.id === id);
-    if(!s) return;
-    
-    // 終了時刻そのもの
-    const endTime = userState.timers[id] || now;
-    
-    // 過去のデータでも表示したい場合、現在時刻より終了時刻が前なら 0 を開始位置にする
-    // 終了時刻から72時間（DUR）引いたものが開始時刻とみなす
-    const startTime = endTime - DUR;
-    
-    // 現在より未来の終了時刻なら、現在からの残り時間を幅とする
-    const timeLeft = endTime - now;
-    
-    // 計算ロジック
-    const left = Math.max(0, (startTime - now) / durationMs * 100);
-    const width = (timeLeft > 0 ? timeLeft : DUR) / durationMs * 100;
-    
-    // 表示（過去のタスクも幅を持たせて表示する）
-    html += `<div class="gantt-bar ${userState.modes[id]}" 
-        title="${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:00まで" 
-        style="left:${left}%; width:${Math.min(100 - left, width)}%; top:${45 + (index % 8) * 16}px;">
-        ${label}</div>`;
+        const s = ALL_STATIONS.find(x => x.id === id);
+        if(!s) return;
+        
+        const endTime = userState.timers[id] || now;
+        const startTime = endTime - DUR;
+        
+        const timeLeft = endTime - now;
+        const left = Math.max(0, (startTime - now) / durationMs * 100);
+        const width = (timeLeft > 0 ? timeLeft : DUR) / durationMs * 100;
+        
+        const expiry = new Date(endTime);
+        const label = `${s.typeName} Lv.${s.lv}`;
+        
+        html += `<div class="gantt-bar ${userState.modes[id]}" 
+            title="${label}: ${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:00まで" 
+            style="left:${left}%; width:${Math.min(100 - left, width)}%; top:${45 + (index % 8) * 16}px;">
+            ${label}</div>`;
     });
     chart.innerHTML = html;
 }
