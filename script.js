@@ -3,23 +3,16 @@ let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: 
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
 
-// 【追加分】既存コードに影響を与えないためのパディング補助関数
+// 文字幅の重み計算
 function getCharWeight(char) {
-    // 記号類を0.5として扱う場合はここを調整
     if (char === '.' || char === '．' || char === ':' || char === '：') return 0.5;
     return /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/.test(char) ? 2.0 : 1.0;
 }
 function calculateRowWeight(str) { return Array.from(str).reduce((acc, char) => acc + getCharWeight(char), 0); }
+
+// パディング関数（ターゲット幅を引数で指定）
 function padSummaryLine(line, targetWidth = 32.0) { 
     let diff = targetWidth - calculateRowWeight(line); 
-    while (diff >= 2.0) { line += "　"; diff -= 2.0; }
-    if (diff >= 1.0) { line += " "; }
-    return line; 
-}
-
-// パディング適用：Windows環境でのみ使用
-function padSummaryLine(line) { 
-    let currentWeight = calculateRowWeight(line), target = 28.0, diff = target - currentWeight; 
     while (diff >= 2.0) { line += "　"; diff -= 2.0; }
     if (diff >= 1.0) { line += " "; }
     return line; 
