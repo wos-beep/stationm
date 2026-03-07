@@ -1,4 +1,4 @@
-const APP_VERSION = "3.5.16", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.5.17", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -142,7 +142,15 @@ function importData(e) { const reader = new FileReader(); reader.onload = (e) =>
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); }
 function setMode(id) { userState.modes[id] = userState.modes[id] === 'self' ? 'other' : 'self'; save(); tick(); }
 function removeStation(id) { userState.selectedIds = userState.selectedIds.filter(x=>x!==id); delete userState.timers[id]; delete userState.modes[id]; save(); tick(); }
-function addStation(id) { userState.selectedIds.push(id); userState.modes[id] = 'self'; save(); tick(); renderModalList(); }
+function addStation(id) { 
+    userState.selectedIds.push(id); 
+    // 【修正前】 userState.modes[id] = 'self';
+    // 【修正後】 初期値を 'other' に変更
+    userState.modes[id] = 'other'; 
+    save(); 
+    tick(); 
+    renderModalList(); 
+}
 function showModal() { document.getElementById('modal').style.display = 'block'; renderModalList(); }
 function hideModal() { document.getElementById('modal').style.display = 'none'; }
 function updateLvFilters() { const type = document.getElementById('f-type').value, lvSel = document.getElementById('f-lv'); lvSel.innerHTML = '<option value="">全Lv</option>'; if(type) [...new Set(MASTER_DATA[type].coords.map(c => c.lv))].sort((a,b)=>a-b).forEach(l => lvSel.innerHTML += `<option value="${l}">Lv.${l}</option>`); renderModalList(); }
