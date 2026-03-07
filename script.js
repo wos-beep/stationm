@@ -1,4 +1,4 @@
-const APP_VERSION = "3.5.15", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.5.16", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -57,11 +57,11 @@ function render(sortedIds) {
         const dayStr = '日月火水木金土'[expiryDate.getDay()];
         const timeStr = expiryDate.toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' });
         const timeDisplay = isExpired ? "争奪中" : (d>0?d+"d ":"")+h.toString().padStart(2,'0')+":"+m_.toString().padStart(2,'0')+":"+s_.toString().padStart(2,'0');
-        const dateDisplay = isExpired ? "" : ` | ${dateStr}(${dayStr}) ${timeStr}`;
 
         list.innerHTML += `<div class="station-card ${m}">
             <div>${s.typeName} Lv.${s.lv} (${s.x},${s.y})</div>
-            <div style="font-size:1.4rem;">${timeDisplay}${dateDisplay}</div>
+            <div style="font-size:0.9rem; color:#666;">${isExpired ? "" : `${dateStr}(${dayStr}) ${timeStr}`}</div>
+            <div style="font-size:1.4rem; margin-bottom:5px;">${timeDisplay}</div>
             <div style="display:flex; gap:5px;">
                 <button class="btn" onclick="sync('${id}')">同期</button>
                 <button class="btn" onclick="removeStation('${id}')">削除</button>
