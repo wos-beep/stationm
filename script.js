@@ -1,4 +1,4 @@
-const APP_VERSION = "3.5.13", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.5.14", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -88,19 +88,30 @@ function renderChart() {
 
 function copySummaryText() { 
     const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => {
-        let text = el.innerText;
+        let text = el.innerText; // 例: "[自] 生産Lv.1: 3/8 12:56"
+        
+        // 1. 形式の整形 ( [自]→【自】, Lv.→Lv, スペース削除 )
         text = text.replace(/\[自\]/g, '【自】').replace(/\[他\]/g, '【他】');
         text = text.replace(/Lv\./g, 'Lv').replace(/: /g, ':');
+        
+        // 2. 日付に曜日を追加
         const dateMatch = text.match(/(\d+\/\d+)\s(\d{2}:\d{2})/);
         if (dateMatch) {
-            const [m, d] = dateMatch[1].split('/').map(Number);
+            const [full, datePart, timePart] = dateMatch;
+            const [m, d] = datePart.split('/').map(Number);
             const dateObj = new Date(new Date().getFullYear(), m - 1, d);
             const dow = '日月火水木金土'[dateObj.getDay()];
-            text = text.replace(dateMatch[0], `${dateMatch[1]}(${dow})_${dateMatch[2]}`);
+            // 曜日付きかつスペースなしの形式へ
+            text = text.replace(full, `${datePart}(${dow})_${timePart}`);
         }
+        
+        // 3. Windowsならパディングを適用 (OS判定)
         return isWindows() ? padSummaryLine(text, 32.0) : text;
     });
+    
+    // Windowsなら改行なし(join(''))、それ以外は改行あり(join('\n'))
     const textToCopy = isWindows() ? entries.join('') : entries.join('\n');
+    
     navigator.clipboard.writeText(textToCopy).then(() => alert("コピーしました"));
 }
 
