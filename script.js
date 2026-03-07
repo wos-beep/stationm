@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.5", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.6", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -101,25 +101,27 @@ function renderChart() {
         const s = ALL_STATIONS.find(x => x.id === id);
         if(!s) return;
 
-        // 保存されている時刻を「開始日時」として扱う
+        // データは「保護開始日時」として解釈
         const startTime = userState.timers[id]; 
-        const endTime = startTime + DUR; // 72時間後が解除日時
+        const endTime = startTime + DUR; // 保護解除は開始から72時間後
+    
+        // 1. バーの開始位置（現在時刻より過去なら0%から、未来なら開始時刻から）
+        const left = Math.max(0, (startTime - now) / durationMs * 100);
+    
+        // 2. バーの長さ（現在時刻から解除時刻までの残り時間）
+        // 計算式: (終了時刻 - 今) / 全体期間 * 100
+        const remainingTime = endTime - now;
+        const width = Math.max(0, (remainingTime / durationMs) * 100);
 
-        // チャート上の表示期間
-        const timeLeftToStart = startTime - now; // 開始まで（過去ならマイナス）
-        const timeLeftToEnd = endTime - now;     // 解除まで
+        const expiry = new Date(endTime);
+        const label = `${s.typeName} Lv.${s.lv}`;
 
-        // バーの開始位置と長さ
-        const left = (timeLeftToStart / durationMs) * 100;
-        const width = (DUR / durationMs) * 100;
-
-        // 現在時刻(now)付近にあるものだけ描画するロジック
-        // ※left + width が0より大きければ、現在時刻より未来にバフが残っている
-        if(endTime > now) {
+        // 終了時刻が現在より未来なら描画
+        if (endTime > now) {
             html += `<div class="gantt-bar ${userState.modes[id]}" 
-                title="解除: ${new Date(endTime).toLocaleTimeString()}" 
-                style="left:${Math.max(0, left)}%; width:${Math.min(100 - left, width)}%; top:${45 + (index % 8) * 16}px;">
-                ${s.typeName} Lv.${s.lv}</div>`;
+                title="${label}: ${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:00まで" 
+                style="left:${left}%; width:${width}%; top:${45 + (index % 8) * 16}px;">
+                ${label}</div>`;
         }
     });
     chart.innerHTML = html;
