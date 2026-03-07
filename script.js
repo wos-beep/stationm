@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.11", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.12", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -99,28 +99,25 @@ function renderChart(sortedIds) {
         html += `<div class="gantt-grid" style="left:${(i / DAYS) * 100}%"></div>`;
     }
     
-    ids.forEach((id, index) => {
+ids.forEach((id, index) => {
         const s = ALL_STATIONS.find(x => x.id === id);
         if(!s) return;
 
         const startTime = userState.timers[id]; 
         const endTime = startTime + DUR; 
-        
-        // 【修正点】現在から終了までの残り時間
         const remaining = Math.max(0, endTime - now);
         
-        // 描画すべき期間が「現在〜終了」まである場合のみ
-        if (endTime > now) {
-            // バーの開始位置（現在時刻より前なら0%）
+        // 終了まで4日以内、かつ開始から終了までが少しでもあれば表示
+        if (endTime > now && startTime < (now + durationMs)) {
             const leftPercent = Math.max(0, (startTime - now) / durationMs * 100);
+            const widthPercent = Math.max(2, (remaining / durationMs) * 100); // 最低2%確保
             
-            // バーの長さ（残り時間に比例。最低でも 1% は確保して見えなくならないようにする）
-            const widthPercent = Math.max(1, (remaining / durationMs) * 100);
-            
+            // 内容を表示するための工夫：文字をバーの中に入れる
             html += `<div class="gantt-bar ${userState.modes[id]}" 
                 title="${s.typeName} Lv.${s.lv}"
-                style="left:${leftPercent}%; width:${widthPercent}%; top:${35 + (index % 8) * 16}px;">
-                ${s.typeName}</div>`;
+                style="left:${leftPercent}%; width:${widthPercent}%; top:${35 + (index % 8) * 16}px; 
+                       display: flex; align-items: center; padding-left: 4px; font-size: 9px; white-space: nowrap;">
+                ${s.typeName} Lv.${s.lv}</div>`;
         }
     });
     chart.innerHTML = html;
