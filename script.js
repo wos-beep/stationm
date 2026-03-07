@@ -1,4 +1,4 @@
-const APP_VERSION = "3.5.11", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.5.12", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -86,18 +86,11 @@ function renderChart() {
     chart.innerHTML = html;
 }
 
-function copySummaryText() {
-    // 1. 各行要素からテキストを取得
+function copySummaryText() { 
     const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => {
-        let text = el.innerText; // 元のテキスト: "[自] 生産Lv.1: 3/8 12:56"
-
-        // 2. 曜日変換・記号置換処理
-        // [自]→【自】, [他]→【他】
+        let text = el.innerText;
         text = text.replace(/\[自\]/g, '【自】').replace(/\[他\]/g, '【他】');
-        // Lv.1→Lv1, : → :
         text = text.replace(/Lv\./g, 'Lv').replace(/: /g, ':');
-        
-        // 3. 日付部分(3/8 12:56)を抽出して「3/8(日)_12:56」に変換
         const dateMatch = text.match(/(\d+\/\d+)\s(\d{2}:\d{2})/);
         if (dateMatch) {
             const [m, d] = dateMatch[1].split('/').map(Number);
@@ -105,22 +98,9 @@ function copySummaryText() {
             const dow = '日月火水木金土'[dateObj.getDay()];
             text = text.replace(dateMatch[0], `${dateMatch[1]}(${dow})_${dateMatch[2]}`);
         }
-
-        // 4. Windows環境ならパディングを適用 (ここが以前消えていた処理です)
         return isWindows() ? padSummaryLine(text, 32.0) : text;
     });
-
-    // 5. Windowsなら改行なし(join(''))、それ以外は改行あり(join('\n'))で結合
     const textToCopy = isWindows() ? entries.join('') : entries.join('\n');
-    
-    navigator.clipboard.writeText(textToCopy).then(() => alert("コピーしました"));
-}
-        
-        return text;
-    });
-
-    // 改行なしで連結することで、貼り付け先の自動折り返しに委ねます
-    const textToCopy = entries.join('');
     navigator.clipboard.writeText(textToCopy).then(() => alert("コピーしました"));
 }
 
