@@ -10,7 +10,7 @@ function getCharWeight(char) {
 }
 function calculateRowWeight(str) { return Array.from(str).reduce((acc, char) => acc + getCharWeight(char), 0); }
 
-// パディング適用：ゲーム内チャットの制限に合わせてtargetを調整可能
+// パディング適用：Windows環境でのみ使用
 function padSummaryLine(line) { 
     let currentWeight = calculateRowWeight(line), target = 28.0, diff = target - currentWeight; 
     while (diff >= 2.0) { line += "　"; diff -= 2.0; }
@@ -79,10 +79,13 @@ function renderChart() {
     chart.innerHTML = html;
 }
 
-// 修正済みコピー関数：改行を排除し、パディングで横並びにする
+// 修正済みコピー関数
 function copySummaryText() {
-    const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => padSummaryLine(el.innerText));
-    const textToCopy = entries.join('');
+    const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => {
+        return isWindows() ? padSummaryLine(el.innerText) : el.innerText;
+    });
+    // Windowsならパディング済みのため改行なしで結合、それ以外は改行あり
+    const textToCopy = isWindows() ? entries.join('') : entries.join('\n');
     navigator.clipboard.writeText(textToCopy).then(() => alert("コピーしました"));
 }
 
