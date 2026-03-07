@@ -7,7 +7,7 @@
 </head>
 <body>
 <div class="controls">
-    <div class="version-info">v3.5.10 | <span id="js-version-tag">v</span></div>
+    <div class="version-info">html: v3.5.11 | <span id="js-version-tag">logic: v</span></div>
     <button class="btn" onclick="showModal()">＋ 追加</button>
     <button class="btn" onclick="shareURL()">🔗 共有リンク</button>
     <button class="btn" onclick="exportData()">💾 保存</button>
@@ -16,6 +16,11 @@
 </div>
 
 <div id="gantt-chart" class="gantt-container"></div>
+
+<details open>
+    <summary>ガントチャート表示/非表示</summary>
+    <div id="gantt-chart" class="gantt-container"></div>
+</details>
 
 <div id="station-list" class="station-grid"></div>
 
@@ -37,4 +42,5 @@
 <script src="script.js"></script>
 </body>
 </html>
+
 
