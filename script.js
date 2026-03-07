@@ -2,6 +2,22 @@ const APP_VERSION = "3.5.9", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
+
+// 文字幅の重み計算：ドット・コロンを0.5に調整
+function getCharWeight(char) {
+    if (char === '.' || char === '．' || char === ':' || char === '：') return 0.5;
+    return /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/.test(char) ? 2.0 : 1.0;
+}
+function calculateRowWeight(str) { return Array.from(str).reduce((acc, char) => acc + getCharWeight(char), 0); }
+
+// パディング適用：ゲーム内チャットの制限に合わせてtargetを調整可能
+function padSummaryLine(line) { 
+    let currentWeight = calculateRowWeight(line), target = 28.0, diff = target - currentWeight; 
+    while (diff >= 2.0) { line += "　"; diff -= 2.0; }
+    if (diff >= 1.0) { line += " "; }
+    return line; 
+}
+
 async function init() {
     document.getElementById('js-version-tag').innerText = APP_VERSION;
     const res = await fetch('station.json'); MASTER_DATA = await res.json();
@@ -45,13 +61,15 @@ function render(sortedIds) {
 function renderChart() {
     const chart = document.getElementById('gantt-chart');
     const DAYS = 4, now = Date.now(), durationMs = DAYS * 86400000;
+    const todayZero = new Date(); todayZero.setHours(0,0,0,0);
+    const offset = (now - todayZero.getTime()) / durationMs * 100;
     let html = '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">';
     for(let i=0; i<=DAYS; i++) {
-        const d = new Date(now + (i * 86400000));
+        const d = new Date(todayZero.getTime() + (i * 86400000));
         html += `<span style="font-size:10px; color:#aaa; width:${100/DAYS}%">${d.getMonth()+1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})</span>`;
     }
     html += '</div>';
-    for(let i=0; i<=DAYS; i++) html += `<div class="gantt-grid" style="left:${(i/DAYS)*100}%"></div>`;
+    for(let i=0; i<=DAYS; i++) html += `<div class="gantt-grid" style="left:${(i/DAYS)*100 - offset}%"></div>`;
     userState.selectedIds.forEach((id, index) => {
         const s = ALL_STATIONS.find(x => x.id === id), startTime = userState.timers[id] || now, endTime = startTime + DUR;
         const left = (startTime - now) / durationMs * 100, right = (endTime - now) / durationMs * 100;
@@ -61,7 +79,13 @@ function renderChart() {
     chart.innerHTML = html;
 }
 
-function copySummaryText() { const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => el.innerText); navigator.clipboard.writeText(entries.join('\n')).then(() => alert("コピーしました")); }
+// 修正済みコピー関数：改行を排除し、パディングで横並びにする
+function copySummaryText() {
+    const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => padSummaryLine(el.innerText));
+    const textToCopy = entries.join('');
+    navigator.clipboard.writeText(textToCopy).then(() => alert("コピーしました"));
+}
+
 function shareURL() { const data = userState.selectedIds.map(id => ALL_STATIONS.findIndex(s => s.id === id) + "." + Math.floor(userState.timers[id] / 1000)).join("-"); const url = window.location.origin + window.location.pathname + "?d=" + data; navigator.clipboard.writeText(url).then(() => alert("URLをコピーしました")); }
 function sync(id) { const val = prompt("残り時間を入力 (例: 1d 09 37 50)"); if(!val) return; let sec = 0, d = val.match(/(\d+)d/i); if(d) sec += parseInt(d[1])*86400; const n = val.replace(/\d+d/i,'').trim().split(/[:：\s]+/u).map(Number); if(n.length === 3) sec += n[0]*3600 + n[1]*60 + n[2]; else if(n.length === 4) sec += n[0]*86400 + n[1]*3600 + n[2]*60 + n[3]; userState.timers[id] = Date.now() + (sec*1000) - DUR; save(); tick(); }
 function exportData() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(userState)], {type: 'application/json'})); a.download = 'station_data.json'; a.click(); }
