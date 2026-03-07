@@ -52,7 +52,22 @@ function render(sortedIds) {
         const s = ALL_STATIONS.find(x => x.id === id), m = userState.modes[id] || 'none';
         const diff = (userState.timers[id] || 0) + DUR - Date.now(), isExpired = diff <= 0;
         const d = Math.floor(diff / 86400000), h = Math.floor((diff % 86400000) / 3600000), m_ = Math.floor((diff % 3600000) / 60000), s_ = Math.floor((diff % 60000) / 1000);
-        list.innerHTML += `<div class="station-card ${m}"><div>${s.typeName} Lv.${s.lv} (${s.x},${s.y})</div><div style="font-size:1.4rem;">${isExpired ? "争奪中" : (d>0?d+"d ":"")+h.toString().padStart(2,'0')+":"+m_.toString().padStart(2,'0')+":"+s_.toString().padStart(2,'0')}</div><div style="display:flex; gap:5px;"><button class="btn" onclick="sync('${id}')">同期</button><button class="btn" onclick="removeStation('${id}')">削除</button><button class="btn" onclick="setMode('${id}')">同盟:${m==='self'?'自':'他'}</button></div></div>`;
+        const expiryDate = new Date(Date.now() + diff);
+        const dateStr = expiryDate.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric' });
+        const dayStr = '日月火水木金土'[expiryDate.getDay()];
+        const timeStr = expiryDate.toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        const timeDisplay = isExpired ? "争奪中" : (d>0?d+"d ":"")+h.toString().padStart(2,'0')+":"+m_.toString().padStart(2,'0')+":"+s_.toString().padStart(2,'0');
+        const dateDisplay = isExpired ? "" : ` | ${dateStr}(${dayStr}) ${timeStr}`;
+
+        list.innerHTML += `<div class="station-card ${m}">
+            <div>${s.typeName} Lv.${s.lv} (${s.x},${s.y})</div>
+            <div style="font-size:1.4rem;">${timeDisplay}${dateDisplay}</div>
+            <div style="display:flex; gap:5px;">
+                <button class="btn" onclick="sync('${id}')">同期</button>
+                <button class="btn" onclick="removeStation('${id}')">削除</button>
+                <button class="btn" onclick="setMode('${id}')">同盟:${m==='self'?'自':'他'}</button>
+            </div>
+        </div>`;
         if (isExpired || diff <= 24 * 3600000) {
             const targetDate = new Date(Date.now() + diff);
             const dateStr = targetDate.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric' });
