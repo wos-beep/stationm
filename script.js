@@ -1,4 +1,4 @@
-const APP_VERSION = "3.5.12", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.5.13", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -53,7 +53,14 @@ function render(sortedIds) {
         const diff = (userState.timers[id] || 0) + DUR - Date.now(), isExpired = diff <= 0;
         const d = Math.floor(diff / 86400000), h = Math.floor((diff % 86400000) / 3600000), m_ = Math.floor((diff % 3600000) / 60000), s_ = Math.floor((diff % 60000) / 1000);
         list.innerHTML += `<div class="station-card ${m}"><div>${s.typeName} Lv.${s.lv} (${s.x},${s.y})</div><div style="font-size:1.4rem;">${isExpired ? "争奪中" : (d>0?d+"d ":"")+h.toString().padStart(2,'0')+":"+m_.toString().padStart(2,'0')+":"+s_.toString().padStart(2,'0')}</div><div style="display:flex; gap:5px;"><button class="btn" onclick="sync('${id}')">同期</button><button class="btn" onclick="removeStation('${id}')">削除</button><button class="btn" onclick="setMode('${id}')">同盟:${m==='self'?'自':'他'}</button></div></div>`;
-        if (isExpired || diff <= 24 * 3600000) summaryList.innerHTML += `<div class="summary-entry">[${m==='self'?'自':'他'}] ${s.typeName}Lv.${s.lv}: ${isExpired?"争奪中":new Date(Date.now()+diff).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>`;
+        if (isExpired || diff <= 24 * 3600000) {
+            const targetDate = new Date(Date.now() + diff);
+            const dateStr = targetDate.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric' });
+            const dayStr = '日月火水木金土'[targetDate.getDay()];
+            const timeStr = targetDate.toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            const displayDate = isExpired ? "争奪中" : `${dateStr}(${dayStr}) ${timeStr}`;
+            summaryList.innerHTML += `<div class="summary-entry">[${m==='self'?'自':'他'}] ${s.typeName}Lv.${s.lv}: ${displayDate}</div>`;
+        }
     });
     renderChart();
 }
