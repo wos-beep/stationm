@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.13", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.14", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -94,7 +94,7 @@ function renderChart(sortedIds) {
     
     const chart = document.getElementById('gantt-chart');
     // 引数がない場合は現在選択されているIDリストを使用する安全策
-    const ids = sortedIds || userState.selectedIds;
+//    const ids = sortedIds || userState.selectedIds;
     const DAYS = 4; // 4日間表示
     const now = Date.now();
     const durationMs = DAYS * 86400000;
