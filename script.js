@@ -1,4 +1,4 @@
-const APP_VERSION = "3.5.10", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.5.11", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -86,15 +86,35 @@ function renderChart() {
     chart.innerHTML = html;
 }
 
-function copySummaryText() { 
-    const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => el.innerText); 
-    if (isWindows()) {
-        // Windowsならパディングして改行なしで結合
-        navigator.clipboard.writeText(entries.map(line => padSummaryLine(line, 32.0)).join('')).then(() => alert("コピーしました"));
-    } else {
-        // それ以外は元の通りの動作
-        navigator.clipboard.writeText(entries.join('\n')).then(() => alert("コピーしました"));
-    }
+function copySummaryText() {
+    const entries = Array.from(document.querySelectorAll('.summary-entry')).map(el => {
+        // 現在のテキスト例: "[自] 生産Lv.1: 3/8 12:56"
+        let text = el.innerText;
+
+        // 1. [自]/[他] を 【自】/【他】 に変換
+        text = text.replace(/\[自\]/g, '【自】').replace(/\[他\]/g, '【他】');
+        
+        // 2. 「Lv.」を「Lv」に、「: 」を「:」に置換してスペースを詰める
+        text = text.replace(/Lv\./g, 'Lv').replace(/: /g, ':');
+        
+        // 3. 日付部分(3/8 12:56)を抽出して曜日を追加し、半角スペースを「_」に置換
+        // 例: "3/8 12:56" -> "3/8(日)_12:56"
+        const dateMatch = text.match(/(\d+\/\d+)\s(\d{2}:\d{2})/);
+        if (dateMatch) {
+            const [fullDate, d, time] = dateMatch;
+            const [m, day] = d.split('/').map(Number);
+            const dateObj = new Date(new Date().getFullYear(), m - 1, day);
+            const dow = '日月火水木金土'[dateObj.getDay()];
+            const formatted = `${d}(${dow})_${time}`;
+            text = text.replace(fullDate, formatted);
+        }
+        
+        return text;
+    });
+
+    // 改行なしで連結することで、貼り付け先の自動折り返しに委ねます
+    const textToCopy = entries.join('');
+    navigator.clipboard.writeText(textToCopy).then(() => alert("コピーしました"));
 }
 
 function shareURL() { const data = userState.selectedIds.map(id => ALL_STATIONS.findIndex(s => s.id === id) + "." + Math.floor(userState.timers[id] / 1000)).join("-"); const url = window.location.origin + window.location.pathname + "?d=" + data; navigator.clipboard.writeText(url).then(() => alert("URLをコピーしました")); }
