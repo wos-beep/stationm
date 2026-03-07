@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.1", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.2", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -101,21 +101,22 @@ function renderChart() {
         const s = ALL_STATIONS.find(x => x.id === id);
         if(!s) return;
         
-        // 固有のタイマー値から終了時刻を計算
-        const startTime = userState.timers[id] || now;
-        const endTime = startTime; // タイマーそのものが終了時刻と想定
+        // 【修正点】ステーションの終了時刻を取得
+        const endTime = userState.timers[id] || now;
+        const timeLeft = endTime - now;
         
-        // 開始位置と、現在から終了までの残り時間（幅）を算出
-        const left = Math.max(0, (startTime - now) / durationMs * 100);
-        const width = (endTime - now) / durationMs * 100;
+        // 【修正点】現在から終了までの残り時間をバーの幅（width）とする
+        const width = (timeLeft / durationMs) * 100;
+        const left = 0; // 現在時刻からスタートなので left は常に 0
         
         const expiry = new Date(endTime);
         const label = `${s.typeName} Lv.${s.lv}`;
         
-        if(width > 0) {
+        // 残り時間がある場合のみ表示
+        if(timeLeft > 0) {
             html += `<div class="gantt-bar ${userState.modes[id]}" 
                 title="${label}: ${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:${expiry.getMinutes().toString().padStart(2,'0')}まで" 
-                style="left:${left}%; width:${Math.min(100 - left, width)}%; top:${45 + (index % 8) * 16}px;">
+                style="left:${left}%; width:${Math.min(100, width)}%; top:${45 + (index % 8) * 16}px;">
                 ${label}</div>`;
         }
     });
