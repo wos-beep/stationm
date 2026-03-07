@@ -83,23 +83,26 @@ function render(sortedIds) {
 
 function renderChart(sortedIds) {
     const chart = document.getElementById('gantt-chart');
+    // 引数がない場合は現在選択されているIDリストを使用する安全策
     const ids = sortedIds || userState.selectedIds;
-    const DAYS = 4;
+    const DAYS = 4; // 4日間表示
     const now = Date.now();
     const durationMs = DAYS * 86400000;
     
-    // ヘッダーとグリッドの描画
+    // 1. ヘッダーとグリッドの描画
     let html = '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">';
     for(let i = 0; i <= DAYS; i++) {
         const d = new Date(now + (i * 86400000));
         html += `<span style="font-size:10px; color:#aaa; width:${100/DAYS}%">${d.getMonth()+1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})</span>`;
     }
     html += '</div>';
+    
     for(let i = 0; i <= DAYS; i++) {
         html += `<div class="gantt-grid" style="left:${(i / DAYS) * 100}%"></div>`;
     }
     
-ids.forEach((id, index) => {
+    // 2. 各ステーションのバーを描画
+    ids.forEach((id, index) => {
         const s = ALL_STATIONS.find(x => x.id === id);
         if(!s) return;
 
@@ -107,12 +110,13 @@ ids.forEach((id, index) => {
         const endTime = startTime + DUR; 
         const remaining = Math.max(0, endTime - now);
         
-        // 終了まで4日以内、かつ開始から終了までが少しでもあれば表示
-        if (endTime > now && startTime < (now + durationMs)) {
+        // 終了時刻が現在より未来であれば表示対象
+        if (endTime > now) {
+            // バーの開始位置（現在時刻より前なら0%から）
             const leftPercent = Math.max(0, (startTime - now) / durationMs * 100);
-            const widthPercent = Math.max(2, (remaining / durationMs) * 100); // 最低2%確保
+            // バーの長さ（残り時間に比例。最低2%確保）
+            const widthPercent = Math.max(2, (remaining / durationMs) * 100);
             
-            // 内容を表示するための工夫：文字をバーの中に入れる
             html += `<div class="gantt-bar ${userState.modes[id]}" 
                 title="${s.typeName} Lv.${s.lv}"
                 style="left:${leftPercent}%; width:${widthPercent}%; top:${35 + (index % 8) * 16}px; 
