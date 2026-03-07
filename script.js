@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.8", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.9", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -86,10 +86,18 @@ function renderChart() {
     const now = Date.now();
     const durationMs = DAYS * 86400000;
     
-    // ガントチャートのヘッダーとグリッドを描画
-    // (省略: ヘッダーHTML生成は前回の通り)
+    // 【重要】最初に html を空文字で初期化する（ここが抜けていました！）
+    let html = '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">';
+    for(let i = 0; i <= DAYS; i++) {
+        const d = new Date(now + (i * 86400000));
+        html += `<span style="font-size:10px; color:#aaa; width:${100/DAYS}%">${d.getMonth()+1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})</span>`;
+    }
+    html += '</div>';
     
-    // バーの描画
+    for(let i = 0; i <= DAYS; i++) {
+        html += `<div class="gantt-grid" style="left:${(i / DAYS) * 100}%"></div>`;
+    }
+    
     userState.selectedIds.forEach((id, index) => {
         const s = ALL_STATIONS.find(x => x.id === id);
         if(!s) return;
@@ -97,20 +105,17 @@ function renderChart() {
         const startTime = userState.timers[id]; 
         const endTime = startTime + DUR; 
         
-        // 1. バーの開始位置（現在時刻より過去なら0%から）
-        const left = Math.max(0, (startTime - now) / durationMs * 100);
-        
-        // 2. バーの長さ（現在時刻〜解除まで）
-        // startTimeが過去でも、endTimeまで残っていればその分だけ表示
+        // 現在から見て、開始が何%の位置か、終了が何%の位置か
+        const leftPercent = Math.max(0, (startTime - now) / durationMs * 100);
         const remaining = Math.max(0, endTime - now);
-        const width = (remaining / durationMs) * 100;
+        const widthPercent = (remaining / durationMs) * 100;
         
-        // 【重要】現在時刻から72時間（DUR）の範囲内にあるものだけ表示
-        if (endTime > now && startTime < (now + durationMs)) {
+        // 72時間バフが有効な期間（現在〜終了）を表示
+        if (endTime > now) {
             html += `<div class="gantt-bar ${userState.modes[id]}" 
                 title="${s.typeName} Lv.${s.lv}"
-                style="left:${left}%; width:${width}%; top:${35 + (index % 8) * 16}px;">
-                ${s.typeName}</div>`;
+                style="left:${leftPercent}%; width:${widthPercent}%; top:${35 + (index % 8) * 16}px;">
+                ${s.typeName} Lv.${s.lv}</div>`;
         }
     });
     chart.innerHTML = html;
