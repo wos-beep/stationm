@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.4", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.5", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -100,26 +100,26 @@ function renderChart() {
     userState.selectedIds.forEach((id, index) => {
         const s = ALL_STATIONS.find(x => x.id === id);
         if(!s) return;
-        
-        const endTime = userState.timers[id] || now;
-        const timeLeft = endTime - now; // 現在から解除までの残り時間
-        
-        // 1. バーの開始位置：常に現在時刻（left: 0%）からスタート
-        const left = 0;
-        
-        // 2. バーの長さ：残り時間をDAYS期間に対するパーセンテージで算出
-        // timeLeft が負（期限切れ）なら長さ0、最大でも100%まで
-        const width = Math.max(0, Math.min(100, (timeLeft / durationMs) * 100));
-        
-        const expiry = new Date(endTime);
-        const label = `${s.typeName} Lv.${s.lv}`;
-        
-        // 残り時間がある（timeLeft > 0）場合のみバーを描画
-        if(timeLeft > 0) {
+
+        // 保存されている時刻を「開始日時」として扱う
+        const startTime = userState.timers[id]; 
+        const endTime = startTime + DUR; // 72時間後が解除日時
+
+        // チャート上の表示期間
+        const timeLeftToStart = startTime - now; // 開始まで（過去ならマイナス）
+        const timeLeftToEnd = endTime - now;     // 解除まで
+
+        // バーの開始位置と長さ
+        const left = (timeLeftToStart / durationMs) * 100;
+        const width = (DUR / durationMs) * 100;
+
+        // 現在時刻(now)付近にあるものだけ描画するロジック
+        // ※left + width が0より大きければ、現在時刻より未来にバフが残っている
+        if(endTime > now) {
             html += `<div class="gantt-bar ${userState.modes[id]}" 
-                title="${label}: ${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:${expiry.getMinutes().toString().padStart(2,'0')}まで" 
-                style="left:${left}%; width:${width}%; top:${45 + (index % 8) * 16}px;">
-                ${label}</div>`;
+                title="解除: ${new Date(endTime).toLocaleTimeString()}" 
+                style="left:${Math.max(0, left)}%; width:${Math.min(100 - left, width)}%; top:${45 + (index % 8) * 16}px;">
+                ${s.typeName} Lv.${s.lv}</div>`;
         }
     });
     chart.innerHTML = html;
