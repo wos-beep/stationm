@@ -86,28 +86,31 @@ function renderChart() {
     const now = Date.now();
     const durationMs = DAYS * 86400000;
     
-    // ガントチャートの初期化（省略）
-    // ...（これまで通りのヘッダーとグリッド生成）...
-
+    // ガントチャートのヘッダーとグリッドを描画
+    // (省略: ヘッダーHTML生成は前回の通り)
+    
+    // バーの描画
     userState.selectedIds.forEach((id, index) => {
         const s = ALL_STATIONS.find(x => x.id === id);
         if(!s) return;
 
-        // 保護開始から72時間後が終了時刻
         const startTime = userState.timers[id]; 
         const endTime = startTime + DUR; 
         
-        // 【デバッグのポイント】今からどれくらい先で終わるか（ミリ秒）
-        const timeLeft = endTime - now;
+        // 1. バーの開始位置（現在時刻より過去なら0%から）
+        const left = Math.max(0, (startTime - now) / durationMs * 100);
         
-        // 終了まで100時間以上ある（＝かなり先の）ものは、バーの幅を100%にする（溢れ防止）
-        const width = Math.min(100, Math.max(0, (timeLeft / durationMs) * 100));
+        // 2. バーの長さ（現在時刻〜解除まで）
+        // startTimeが過去でも、endTimeまで残っていればその分だけ表示
+        const remaining = Math.max(0, endTime - now);
+        const width = (remaining / durationMs) * 100;
         
-        // 今の時刻より未来に終わるものだけ描画する
-        if (timeLeft > 0) {
+        // 【重要】現在時刻から72時間（DUR）の範囲内にあるものだけ表示
+        if (endTime > now && startTime < (now + durationMs)) {
             html += `<div class="gantt-bar ${userState.modes[id]}" 
-                style="left:0%; width:${width}%; top:${45 + (index % 8) * 16}px;">
-                ${s.typeName} Lv.${s.lv}</div>`;
+                title="${s.typeName} Lv.${s.lv}"
+                style="left:${left}%; width:${width}%; top:${35 + (index % 8) * 16}px;">
+                ${s.typeName}</div>`;
         }
     });
     chart.innerHTML = html;
