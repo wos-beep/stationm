@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.6", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.7", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -97,33 +97,33 @@ function renderChart() {
         html += `<div class="gantt-grid" style="left:${(i / DAYS) * 100}%"></div>`;
     }
     
-    userState.selectedIds.forEach((id, index) => {
-        const s = ALL_STATIONS.find(x => x.id === id);
-        if(!s) return;
+userState.selectedIds.forEach((id, index) => {
+    const s = ALL_STATIONS.find(x => x.id === id);
+    if(!s) return;
 
-        // データは「保護開始日時」として解釈
-        const startTime = userState.timers[id]; 
-        const endTime = startTime + DUR; // 保護解除は開始から72時間後
+    const startTime = userState.timers[id]; 
+    const endTime = startTime + DUR; // 保護開始から72時間
     
-        // 1. バーの開始位置（現在時刻より過去なら0%から、未来なら開始時刻から）
-        const left = Math.max(0, (startTime - now) / durationMs * 100);
+    // 現在時刻から見た開始と終了の相対位置（%）
+    const leftPercent = (startTime - now) / durationMs * 100;
+    const widthPercent = (DUR / durationMs) * 100; // バーの全長は72時間分
     
-        // 2. バーの長さ（現在時刻から解除時刻までの残り時間）
-        // 計算式: (終了時刻 - 今) / 全体期間 * 100
-        const remainingTime = endTime - now;
-        const width = Math.max(0, (remainingTime / durationMs) * 100);
-
+    // 現在時刻より前に保護が切れているもの（争奪中）は除外する等の調整が可能
+    // ここでは「現在時刻から見て、終了時刻が過ぎていないもの」を全て描画
+    if (endTime > now) {
+        // バーの左端が画面外（左側）に隠れる場合、その分を幅から削る
+        const displayLeft = Math.max(0, leftPercent);
+        const displayWidth = widthPercent - (displayLeft - leftPercent);
+        
         const expiry = new Date(endTime);
         const label = `${s.typeName} Lv.${s.lv}`;
-
-        // 終了時刻が現在より未来なら描画
-        if (endTime > now) {
-            html += `<div class="gantt-bar ${userState.modes[id]}" 
-                title="${label}: ${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:00まで" 
-                style="left:${left}%; width:${width}%; top:${45 + (index % 8) * 16}px;">
-                ${label}</div>`;
-        }
-    });
+        
+        html += `<div class="gantt-bar ${userState.modes[id]}" 
+            title="${label}: ${expiry.getMonth()+1}/${expiry.getDate()} ${expiry.getHours()}:00まで" 
+            style="left:${displayLeft}%; width:${Math.max(0, displayWidth)}%; top:${45 + (index % 8) * 16}px;">
+            ${label}</div>`;
+    }
+});
     chart.innerHTML = html;
 }
 
