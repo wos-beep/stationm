@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.12", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.13", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -82,6 +82,16 @@ function render(sortedIds) {
 }
 
 function renderChart(sortedIds) {
+    // 【ここに挿入】デバッグ用コード
+    console.log("--- Debug RenderChart ---");
+    const ids = sortedIds || userState.selectedIds;
+    console.log("IDリストの長さ:", ids.length);
+    ids.forEach((id, idx) => {
+        const start = userState.timers[id];
+        const end = start + 259200000;
+        console.log(`Index ${idx}: ${id} (終了: ${new Date(end).toLocaleString()})`);
+    });
+    
     const chart = document.getElementById('gantt-chart');
     // 引数がない場合は現在選択されているIDリストを使用する安全策
     const ids = sortedIds || userState.selectedIds;
