@@ -82,6 +82,9 @@ function render(sortedIds) {
 
 function renderChart() {
     const chart = document.getElementById('gantt-chart');
+    // 強制的に中身を書き換えてみる
+    chart.innerHTML = '<div style="background:red; color:white; padding:10px;">デバッグ表示：この赤い枠が見えますか？</div>';
+    const chart = document.getElementById('gantt-chart');
     const DAYS = 4;
     const now = Date.now();
     const durationMs = DAYS * 86400000;
