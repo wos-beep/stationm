@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.14", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.15", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -82,19 +82,16 @@ function render(sortedIds) {
 }
 
 function renderChart(sortedIds) {
-    // 【ここに挿入】デバッグ用コード
-    console.log("--- Debug RenderChart ---");
+    // 1. 毎秒の自動実行を一時的に止めるため、関数の最初にこれを入れます
+    // ※もしタイマー処理が別にあれば、一時的にコメントアウトしてください
+    
+    // 2. ログ出力（件数確認）
     const ids = sortedIds || userState.selectedIds;
-    console.log("IDリストの長さ:", ids.length);
-    ids.forEach((id, idx) => {
-        const start = userState.timers[id];
-        const end = start + 259200000;
-        console.log(`Index ${idx}: ${id} (終了: ${new Date(end).toLocaleString()})`);
-    });
+    console.log("描画対象のID件数:", ids.length);
     
     const chart = document.getElementById('gantt-chart');
     // 引数がない場合は現在選択されているIDリストを使用する安全策
-//    const ids = sortedIds || userState.selectedIds;
+    //    const ids = sortedIds || userState.selectedIds;
     const DAYS = 4; // 4日間表示
     const now = Date.now();
     const durationMs = DAYS * 86400000;
@@ -134,7 +131,14 @@ function renderChart(sortedIds) {
                 ${s.typeName} Lv.${s.lv}</div>`;
         }
     });
+
+    // 3. 【重要】htmlが空でないか確認
+    console.log("生成されたHTML:", html);
+
     chart.innerHTML = html;
+    
+    // 4. 強制的に実行を止める（これを書くとこれ以上実行されなくなります）
+    throw new Error("デバッグのため実行を停止しました");
 }
 
 function copySummaryText() { 
