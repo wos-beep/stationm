@@ -18,10 +18,12 @@ body { font-family: sans-serif; background: var(--bg); color: #e0e0e0; padding: 
     border-radius: 8px; 
     margin-bottom: 15px; 
     border: 1px solid #444; 
-    min-height: 180px; /* 最小高さを180pxに */
-    height: auto;      /* 内容に応じて自動で広がるように */
+    
+    /* 高さを固定してスクロールさせる */
+    height: 180px; 
+    overflow-y: auto; /* はみ出したらスクロールバーを出す */
+    
     position: relative; 
-    overflow: visible; /* はみ出さないように可視化 */
 }
 .gantt-bar { height: 14px; border-radius: 4px; position: absolute; display: flex; align-items: center; box-sizing: border-box; font-size: 9px; color: #fff; overflow: hidden; white-space: nowrap; padding-left: 2px; }
 .gantt-bar.self { background-color: var(--self); }
