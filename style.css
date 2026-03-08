@@ -30,9 +30,10 @@ body { font-family: sans-serif; background: var(--bg); color: #e0e0e0; padding: 
 .gantt-bar.other { background-color: var(--danger); }
 .gantt-grid { 
     position: absolute; 
-    top: 45px;      /* ヘッダーの高さに合わせて調整 */
-    bottom: 0px;    /* 完全に底まで伸ばす */
+    top: 0;           /* コンテナの最上部から */
+    bottom: 0;        /* コンテナの最下部まで */
     border-left: 1px solid #444; 
     pointer-events: none; 
-    z-index: 1;     /* バーの下に配置 */
+    z-index: 0;       /* バーより背面に */
+    margin-left: 15px; /* コンテナのpadding分だけ右にずらす */
 }
