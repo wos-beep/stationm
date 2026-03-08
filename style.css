@@ -14,15 +14,12 @@ body { font-family: sans-serif; background: var(--bg); color: #e0e0e0; padding: 
 /* ガントチャート */
 .gantt-container { 
     background: #222; 
-    padding: 15px; 
+    padding: 0; /* 15pxを削除 */
     border-radius: 8px; 
     margin-bottom: 15px; 
     border: 1px solid #444; 
-    
-    /* 高さを固定してスクロールさせる */
     height: 180px; 
-    overflow-y: auto; /* はみ出したらスクロールバーを出す */
-    
+    overflow-y: auto; 
     position: relative; 
 }
 .gantt-bar { height: 14px; border-radius: 4px; position: absolute; display: flex; align-items: center; box-sizing: border-box; font-size: 9px; color: #fff; overflow: hidden; white-space: nowrap; padding-left: 2px; }
@@ -30,10 +27,9 @@ body { font-family: sans-serif; background: var(--bg); color: #e0e0e0; padding: 
 .gantt-bar.other { background-color: var(--danger); }
 .gantt-grid { 
     position: absolute; 
-    top: 45px;          /* ヘッダー分を空ける */
-    height: calc(100% - 45px); /* 親コンテナの高さからヘッダー分を引いた残り全部 */
+    top: 45px; 
+    bottom: 0; 
     border-left: 1px solid #444; 
     pointer-events: none; 
     z-index: 0; 
-    margin-left: 15px;  /* コンテナのpaddingを考慮 */
 }
