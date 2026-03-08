@@ -28,4 +28,11 @@ body { font-family: sans-serif; background: var(--bg); color: #e0e0e0; padding: 
 .gantt-bar { height: 14px; border-radius: 4px; position: absolute; display: flex; align-items: center; box-sizing: border-box; font-size: 9px; color: #fff; overflow: hidden; white-space: nowrap; padding-left: 2px; }
 .gantt-bar.self { background-color: var(--self); }
 .gantt-bar.other { background-color: var(--danger); }
-.gantt-grid { position: absolute; top: 35px; bottom: 10px; border-left: 1px solid #555; }
+.gantt-grid { 
+    position: absolute; 
+    top: 45px;      /* ヘッダーの高さに合わせて調整 */
+    bottom: 0px;    /* 完全に底まで伸ばす */
+    border-left: 1px solid #444; 
+    pointer-events: none; 
+    z-index: 1;     /* バーの下に配置 */
+}
