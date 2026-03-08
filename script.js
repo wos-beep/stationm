@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.19", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.20", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -95,7 +95,7 @@ function renderChart(sortedIds) {
     
     // 1. ヘッダーとグリッドの描画
     // ヘッダーの高さを確保し、縦型ラベルを配置
-    let html = '<div style="height: 45px; position: relative; margin-bottom: 5px;">';
+    let html = '<div style="padding: 15px; box-sizing: border-box; position: relative;">';
     for(let i = 0; i <= totalSteps; i++) {
         if (i % 6 === 0) { // 6時間おきに描画
             const d = new Date(now + (i * 3600000));
