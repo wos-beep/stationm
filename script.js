@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.15", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.16", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -126,7 +126,7 @@ function renderChart(sortedIds) {
             
             html += `<div class="gantt-bar ${userState.modes[id]}" 
                 title="${s.typeName} Lv.${s.lv}"
-                style="left:${leftPercent}%; width:${widthPercent}%; top:${35 + (index % 8) * 16}px; 
+                style="left:${leftPercent}%; width:${widthPercent}%; top:${35 + (index * 18)}px; 
                        display: flex; align-items: center; padding-left: 4px; font-size: 9px; white-space: nowrap;">
                 ${s.typeName} Lv.${s.lv}</div>`;
         }
