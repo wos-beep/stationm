@@ -27,9 +27,10 @@ body { font-family: sans-serif; background: var(--bg); color: #e0e0e0; padding: 
 .gantt-bar.other { background-color: var(--danger); }
 .gantt-grid { 
     position: absolute; 
-    top: 45px; 
-    bottom: 0; 
-    border-left: 1px solid #444; 
+    top: 45px;          /* ヘッダー分を開ける */
+    height: calc(100% - 45px); /* 親の高さに合わせて計算 */
+    border-left: 2px solid red; /* 【テスト用】太い赤線にする */
     pointer-events: none; 
-    z-index: 0; 
+    z-index: 100;       /* 【テスト用】一番手前にする */
+    margin-left: 15px; 
 }
