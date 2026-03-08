@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.20", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.21", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -153,7 +153,7 @@ function copySummaryText() {
         text = text.replace(/Lv\./g, 'Lv').replace(/:/g, ':');
         
         // 3. 日付＋曜日＋時刻整形
-        const dateMatch = text.match(/(\d+\/\d+)(\d{2}:\d{2})/);
+        const dateMatch = text.match(/(\d+\/\d+)\(.\)(\d{2}:\d{2})/);
         if (dateMatch) {
             console.log("マッチした文字列:", dateMatch[0]); // ←これを確認！
             const [full, datePart, timePart] = dateMatch;
