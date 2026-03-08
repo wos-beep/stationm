@@ -155,6 +155,7 @@ function copySummaryText() {
         // 3. 日付＋曜日＋時刻整形
         const dateMatch = text.match(/(\d+\/\d+)(\d{2}:\d{2})/);
         if (dateMatch) {
+            console.log("マッチした文字列:", dateMatch[0]); // ←これを確認！
             const [full, datePart, timePart] = dateMatch;
             const [m, d] = datePart.split('/').map(Number);
             const dateObj = new Date(new Date().getFullYear(), m - 1, d);
