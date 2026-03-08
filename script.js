@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.17", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.18", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -88,18 +88,24 @@ function renderChart(sortedIds) {
     const now = Date.now();
     const durationMs = DAYS * 86400000;
     
-    // 1. ヘッダーとグリッドの描画（1時間単位 = 1日24分割）
+// 1時間単位の目盛り設定
     const HOURS_PER_DAY = 24;
     const totalSteps = DAYS * HOURS_PER_DAY;
+    const daysOfWeek = '日月火水木金土';
     
-    let html = '<div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:9px; color:#aaa;">';
+    // ヘッダーを縦積みレイアウトに変更
+    let html = '<div style="display:flex; justify-content:space-between; margin-bottom:15px; height: 30px; position: relative;">';
+    
     for(let i = 0; i <= totalSteps; i++) {
-        // 6時間ごとにラベルを表示
+        // 6時間ごとにラベルを表示（縦積みにする）
         if (i % 6 === 0) {
             const d = new Date(now + (i * 3600000));
-            html += `<span style="width:${100/totalSteps}%">${d.getDate()}日 ${d.getHours()}:00</span>`;
-        } else {
-            html += `<span style="width:${100/totalSteps}%"></span>`;
+            // 縦に並べるためのCSS（line-heightで調整）
+            html += `<div style="position: absolute; left:${(i / totalSteps) * 100}%; font-size:9px; color:#aaa; line-height: 1; text-align: center; transform: translateX(-50%);">
+                        <div style="font-weight: bold;">${d.getDate()}</div>
+                        <div style="font-size: 8px;">(${daysOfWeek[d.getDay()]})</div>
+                        <div>${d.getHours()}</div>
+                     </div>`;
         }
     }
     html += '</div>';
