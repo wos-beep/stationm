@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.16", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
+const APP_VERSION = "3.6.17", STORAGE_KEY = 'wos_st_manage_data', DUR = 72 * 3600000;
 let MASTER_DATA = {}, ALL_STATIONS = [], userState = { selectedIds: [], timers: {}, modes: {} };
 
 function isWindows() { return navigator.userAgent.includes("Windows"); }
@@ -82,30 +82,31 @@ function render(sortedIds) {
 }
 
 function renderChart(sortedIds) {
-    // 1. 毎秒の自動実行を一時的に止めるため、関数の最初にこれを入れます
-    // ※もしタイマー処理が別にあれば、一時的にコメントアウトしてください
-    
-    // 2. ログ出力（件数確認）
-    const ids = sortedIds || userState.selectedIds;
-    console.log("描画対象のID件数:", ids.length);
-    
     const chart = document.getElementById('gantt-chart');
-    // 引数がない場合は現在選択されているIDリストを使用する安全策
-    //    const ids = sortedIds || userState.selectedIds;
+    const ids = sortedIds || userState.selectedIds;
     const DAYS = 4; // 4日間表示
     const now = Date.now();
     const durationMs = DAYS * 86400000;
     
-    // 1. ヘッダーとグリッドの描画
-    let html = '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">';
-    for(let i = 0; i <= DAYS; i++) {
-        const d = new Date(now + (i * 86400000));
-        html += `<span style="font-size:10px; color:#aaa; width:${100/DAYS}%">${d.getMonth()+1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})</span>`;
+    // 1. ヘッダーとグリッドの描画（1時間単位 = 1日24分割）
+    const HOURS_PER_DAY = 24;
+    const totalSteps = DAYS * HOURS_PER_DAY;
+    
+    let html = '<div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:9px; color:#aaa;">';
+    for(let i = 0; i <= totalSteps; i++) {
+        // 6時間ごとにラベルを表示
+        if (i % 6 === 0) {
+            const d = new Date(now + (i * 3600000));
+            html += `<span style="width:${100/totalSteps}%">${d.getDate()}日 ${d.getHours()}:00</span>`;
+        } else {
+            html += `<span style="width:${100/totalSteps}%"></span>`;
+        }
     }
     html += '</div>';
     
-    for(let i = 0; i <= DAYS; i++) {
-        html += `<div class="gantt-grid" style="left:${(i / DAYS) * 100}%"></div>`;
+    // グリッド線（1時間単位）
+    for(let i = 0; i <= totalSteps; i++) {
+        html += `<div class="gantt-grid" style="left:${(i / totalSteps) * 100}%"></div>`;
     }
     
     // 2. 各ステーションのバーを描画
@@ -119,9 +120,7 @@ function renderChart(sortedIds) {
         
         // 終了時刻が現在より未来であれば表示対象
         if (endTime > now) {
-            // バーの開始位置（現在時刻より前なら0%から）
             const leftPercent = Math.max(0, (startTime - now) / durationMs * 100);
-            // バーの長さ（残り時間に比例。最低2%確保）
             const widthPercent = Math.max(2, (remaining / durationMs) * 100);
             
             html += `<div class="gantt-bar ${userState.modes[id]}" 
@@ -131,14 +130,7 @@ function renderChart(sortedIds) {
                 ${s.typeName} Lv.${s.lv}</div>`;
         }
     });
-
-    // 3. 【重要】htmlが空でないか確認
-    console.log("生成されたHTML:", html);
-
     chart.innerHTML = html;
-    
-    // 4. 強制的に実行を止める（これを書くとこれ以上実行されなくなります）
-    throw new Error("デバッグのため実行を停止しました");
 }
 
 function copySummaryText() { 
