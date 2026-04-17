@@ -13,6 +13,7 @@ body { font-family: sans-serif; background: var(--bg); color: #e0e0e0; padding: 
 
 /* ガントチャート */
 .gantt-container { 
+    display: none;
     background: #222; 
     padding: 0; /* 15pxを削除 */
     border-radius: 8px; 
